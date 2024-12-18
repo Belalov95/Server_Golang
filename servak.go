@@ -61,7 +61,7 @@ func postGoods(c *gin.Context) {
 		// c.IndentedJSON(http.StatusNotFound, gin.H{"error": "err.Error()"}) //отправляем ответ лиенту что товар не найден
 		return
 	}
-	//добаялем новые товары в магазин
+	//добавялем новые товары в магазин
 	// goods = append(goods, newGoods)              //добавляем newGoods в массив goods
 	// err := insertStore(newGoods)
 	c.IndentedJSON(http.StatusCreated, newGoods) //оправляем клиенту ответ в формате JSON
@@ -85,3 +85,13 @@ func getGoodsByID(c *gin.Context) {
 	// если есть ошибка после getStoreByID + "error": err.Error()
 	c.IndentedJSON(http.StatusNotFound, gin.H{"сообщение": "товар не был найден"}) //отправляем ответ лиенту что товар не найден
 }
+
+//func getGoodsByID(c *gin.Context) {
+//	id:=c.Param("id")
+//	var good footballstore
+//  if err:=db.First(&good, id).Error; err!=nil{
+//  c.IntentedJSON(http.StatusNotFound, gin.H{"error":"this product not found"})
+//  return
+//  }
+//  c.IntentedJSON(http.StatusOK, good)
+//}
