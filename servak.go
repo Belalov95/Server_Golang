@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 )
 
 // представление того, какие у меня будут данные
@@ -14,84 +17,100 @@ type footballstore struct {
 	Price    float64 `json:"price"`    //цена товара // 1.12 -> 112 -> bigint (в golang используй decimal либу)
 }
 
-// TODO: убрать это в БД, создать таблицу и положить скрипт sql в ./migration/init.sql и убрать var goods = []footballstore
-// CREATE TABLE store ...
-// объявляю изначальные тестовые данные, список товаров
-// var goods = []footballstore{
-// 	{ID: "1", Category: "Одежда", Name: "Футбольная форма", Price: 25.99},
-// 	{ID: "2", Category: "Обувь", Name: "Бутсы", Price: 32.99},
-// 	{ID: "3", Category: "Аксессуары", Name: "Брелок в виде мяча", Price: 8.99},
-// }
-// func Connect() sql.Conn
-// gorm db.Exec().Where(``).Params(``), pgx или sql -> db.Exec(`select * from store`)
+var Conn *pgx.Conn //эта переменная хранит в себе соединение с бд
 
-// реализовать func listStore, updateStore, getStoreByID, insertStore
+func main() { //создается для подключения к бд
+	var err error                                                                                         //эта переменная хранит в себе данные об ошибках
+	Conn, err = pgx.Connect(context.Background(), "postgres://postgres:postgres@localhost:5432/postgres") //присваиваем переменной Conn значение соединения
+	if err != nil {
+		log.Fatalf("Unable to connect to database: %v\n", err) // %v\n позволяет включить конкретное сообщение об ошибке, без %v\n будет выведено просто сообщение которое в ""
+	}
+	defer Conn.Close(context.Background()) //отложенное закрытие функции, т.е ф-ция которая идет после defer будет выполена после завершения основной ф-ции
+	//и спросить у матвея зачем мы постоянно добавляем context.background
 
-// var globalConn sql.Conn
-
-// назначаем функцию обработчика пути к конечной точке
-func main() {
-	// TODO:
-	// Example: postgres://user:password@postgres_name:service_port/db?sslmode=disable
-	// conn, err := Connect(postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable)
-	// globalConn = conn
-
-	router := gin.Default()                //создаем маршрутизатор, который помогает серверу направлять входящие запросы к нужной ф-ции
-	router.GET("/goods", listGoods)        //определяем маршрут "/goods" и указываем ф-цию
-	router.GET("/goods/:id", getGoodsByID) //определение маршрута, чтобы искать по id
-	router.POST("/goods", postGoods)       //определение маршрута для POST-запроса на адрес /goods
+	router := gin.Default()               //создаем маршрутизатор, который помогает серверу направлять входящие запросы к нужной ф-ции
+	router.GET("/goods", listStore)       //определяем маршрут "/goods" и указываем ф-цию
+	router.GET("/goods/:id", getGoodByID) //определение маршрута, чтобы искать по id
+	router.POST("/goods", insertStore)    //определение маршрута для POST-запроса на адрес /goods
+	router.PUT("/goods/:id", updateStore) //определение маршрута для обновления данных о товаре
+	// спросить, ане легче ли нам использовать вместо put putch, т.к обновляет все данные, а putch 1
 
 	router.Run("localhost:8080") //запускаем сервер на localhost с портом 8080
 }
 
-// получаем список товаров
-func listGoods(c *gin.Context) {
-	// goods, err= := listStore()
-	c.IndentedJSON(http.StatusOK, goods)
-}
-
-// postGoods добавляет товары используя данные в формате JSON, которые приходят в теле HTTP-запроса
-func postGoods(c *gin.Context) {
-	var newGoods footballstore
-
-	//функция BindJSON используется для привязки(заполнения) данных из полученного JSON к переменной newGoods
-	if err := c.BindJSON(&newGoods); err != nil { //проверка на ошибку
-		// TODO: отдать ошибку
-		// если есть ошибка после getStoreByID + "error": err.Error()
-		// c.IndentedJSON(http.StatusNotFound, gin.H{"error": "err.Error()"}) //отправляем ответ лиенту что товар не найден
+func listStore(c *gin.Context) { //создается для получения данных из таблицы бд (например, для возвращения списка товаров)
+	rows, err := Conn.Query(context.Background(), "SELECT id, category, name, price from footballstore") //выполнение SQL запроса через соединение с бд
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when executing sql query"}) //ошибка при выполнении sql запроса
 		return
 	}
-	//добавялем новые товары в магазин
-	// goods = append(goods, newGoods)              //добавляем newGoods в массив goods
-	// err := insertStore(newGoods)
-	c.IndentedJSON(http.StatusCreated, newGoods) //оправляем клиенту ответ в формате JSON
+	defer rows.Close()
+
+	var goods []footballstore //создается срез
+
+	for rows.Next() { //метод, который используется для перебора строк
+		var good footballstore                                              //объявляем переменную good, чтобы хранить данные для каждой строки, которую мы считваем из бд
+		err := rows.Scan(&good.ID, &good.Category, &good.Name, &good.Price) //извлекаем данные из текущей струтуры базы данны(id, catogory ...) и присваиваем их полям структуры(&id, &category ...), чтобы можно было работать с этими данными
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when reading data"}) //Ошибка при чтении данных
+			return
+		}
+		goods = append(goods, good) //добавляем извлеченные товары в наш срез
+	}
+	if err := rows.Err(); err != nil { //проверка на ошибку после перебора
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error after sorting through the items"}) //Ошибка после перербора товаров
+		return
+	}
+	c.JSON(http.StatusOK, goods) //отправляем список товаров в формате JSON
 }
 
-// getGoodsByID ищет альбом, у которого ID совпадает с уникальным идентификатором id (например, 1,2...)
-// Если такой товар найден, то функция возвращает его как ответ
-func getGoodsByID(c *gin.Context) {
-	id := c.Param("id") //получаем id из параметров URL
+func updateStore(c *gin.Context) { //создаем эту ф-цию для обновления данных в магазине (в базе данных)
+	id := c.Param("id") //получяем id нужного товара для обновления
 
-	// TODO: good, err := getStoreByID(id)
-	// //просматриваем список товаров и ищем в нем товар с нужным id, который запросил клиент
-	// for _, a := range goods { //цикл, который перебирает каждый товар в списке товаров
-	// 	if a.ID == id { //проверка, совпадает ли ID текущего альбома с id, который был получен из запроса
-	// 		c.IndentedJSON(http.StatusOK, a)
-	// 		return
-	// 	}
-	// }
+	var updatedGoods footballstore //создаем переменную updatedGoods чтобы хранить в ней обновленные товары
 
-	// TODO: пиши на англ
-	// если есть ошибка после getStoreByID + "error": err.Error()
-	c.IndentedJSON(http.StatusNotFound, gin.H{"сообщение": "товар не был найден"}) //отправляем ответ лиенту что товар не найден
+	if err := c.BindJSON(&updatedGoods); err != nil { //считываем с помощью BindJSON новые данные которые отправил клиент и передаем их переменной updatedGoods
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Error unconnecting data"}) //некоректные данные
+		return
+	}
+	query := "UPDATE footballstore SET category = $1, name = $2, price = $3 WHERE id = $4"                             //обновляем данные через SQL
+	_, err := Conn.Exec(context.Background(), query, updatedGoods.Category, updatedGoods.Name, updatedGoods.Price, id) //выполняем SQL запрос для обновления данных и присваиваем новые значения переменным
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error during the update"}) //ошибка при обнолении
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "The good has been successfully updated"}) //отправляем клиенту ответ об успешном обновлении
 }
 
-//func getGoodsByID(c *gin.Context) {
-//	id:=c.Param("id")
-//	var good footballstore
-//  if err:=db.First(&good, id).Error; err!=nil{
-//  c.IntentedJSON(http.StatusNotFound, gin.H{"error":"this product not found"})
-//  return
-//  }
-//  c.IntentedJSON(http.StatusOK, good)
-//}
+func getGoodByID(c *gin.Context) { //создается для поиска товара по его id
+	id := c.Param("id")
+
+	var good footballstore //создвем переменную для хранения данных о продукте
+
+	query := "SELECT id, name, category, price FROM footballstore WHERE id = $1" // выполняем SQL запрос, где выдается конкретный id, в данном случае 1
+	row := Conn.QueryRow(context.Background(), query, id)                        //используется чтобы выдать только 1 строку, в данном случае  id строку
+
+	err := row.Scan(&good.ID, &good.Category, &good.Name, &good.Price)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Good not found"}) //товар не найден
+		return
+	}
+	c.JSON(http.StatusOK, good)
+}
+
+func insertStore(c *gin.Context) { //добавляем новую запись в бд
+	var newGood footballstore
+
+	if err := c.BindJSON(&newGood); err != nil { //считываем json данные и присваиваем их переменной newGood
+		c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't assign data"}) //не удалось присвоить данные
+		return
+	}
+	query := "INSERT INTO footballstore (category, name, price) VALUES ($1, $2,  $3)"
+	_, err := Conn.Exec(context.Background(), query, newGood.Category, newGood.Name, newGood.Price)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "couldn't assign data"}) //не удалось присвоить данные
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "The good added successfully"}) //товар успешно добавлен
+}
