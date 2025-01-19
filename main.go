@@ -15,14 +15,14 @@ type footballstore struct {
 	ID       string          `json:"id"`       //объявление номера // serial primary key
 	Category string          `json:"category"` //категория товара: Одежда, обувь, аксессуары и тд.
 	Name     string          `json:"name"`     //название товара:форма, бутсы, брелки и тд.
-	Price    decimal.Decimal `json:"price"`    //цена товара // 1.12 -> 112 -> bigint (в golang используй decimal либу)
+	Price    decimal.Decimal `json:"price"`    //цена товара
 }
 
 var Conn *pgx.Conn //эта переменная хранит в себе соединение с бд
 
 func main() {
-	var err error                                                                                         //эта переменная хранит в себе данные об ошибках
-	Conn, err = pgx.Connect(context.Background(), "postgres://postgres:postgres@localhost:5432/postgres") //присваиваем переменной Conn значение соединения
+	var err error                                                                                   //эта переменная хранит в себе данные об ошибках
+	Conn, err = pgx.Connect(context.Background(), "postgresql://postgres:@localhost:5433/postgres") //присваиваем переменной Conn значение соединения
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v\n", err) // %v\n позволяет включить конкретное сообщение об ошибке, без %v\n будет выведено просто сообщение которое в ""
 	}
@@ -35,12 +35,12 @@ func main() {
 	router.PUT("/goods/:id", updateStore)   //определение маршрута для обновления данных о товаре
 	router.DELETE("/goods/:id", DeleteById) //определение маршрута для удаления
 
-	router.Run("localhost:8080") //запускаем сервер на localhost с портом 8080
+	router.Run("0.0.0.0:8080") //запускаем сервер на localhost с портом 8080
 }
 
 // создается для получения данных из таблицы бд
 func listStore(c *gin.Context) {
-	rows, err := Conn.Query(context.Background(), "SELECT id, category, name, price from footballstore") //выполнение SQL запроса через соединение с бд
+	rows, err := Conn.Query(context.Background(), `SELECT "id", "category", "name", "price" from "footballstore"`) //выполнение SQL запроса через соединение с бд
 	if err != nil {
 		log.Println(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when executing sql query"}) //ошибка при выполнении sql запроса
