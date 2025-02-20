@@ -26,8 +26,8 @@ func New(goodsUsecase *usecase.GoodsUsecase) *Handle {
 
 // создается для получения данных из таблицы бд
 func (h *Handle) ListStore(c *gin.Context) {
-	goods, err := h.goodsUsecase.ListStore(c * gin.Context()) //присваиваем переменной goods список товаров
-	if err := rows.Err(); err != nil {                        //проверка на ошибку после перебора
+	goods, err := h.goodsUsecase.ListStore(c) //присваиваем переменной goods список товаров
+	if err != nil {                           //проверка на ошибку после перебора
 		log.Println(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error after sorting through the items"}) //Ошибка после перербора товаров
 		return
@@ -46,6 +46,7 @@ func (h *Handle) UpdateStore(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Error unconnecting data"}) //некоректные данные
 		return
 	}
+	h.goodsUsecase.UpdateStore(c, id, updatedGoods)
 	c.JSON(http.StatusOK, gin.H{"message": "The good has been successfully updated"}) //отправляем клиенту ответ об успешном обновлении
 }
 

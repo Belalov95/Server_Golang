@@ -25,12 +25,12 @@ func New(conn *pgx.Conn) *GoodsUsecase {
 	return &GoodsUsecase{conn: conn}
 }
 
-func (g *GoodsUsecase) ListStore(c *gin.Context) error {
+func (g *GoodsUsecase) ListStore(c *gin.Context) ([]footballstore, error) {
 	rows, err := g.conn.Query(context.Background(), `SELECT "id", "category", "name", "price" from "footballstore"`) //выполнение SQL запроса через соединение с бд
 	if err != nil {
 		log.Println(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when executing sql query"}) //ошибка при выполнении sql запроса
-		return nil
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -42,11 +42,11 @@ func (g *GoodsUsecase) ListStore(c *gin.Context) error {
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when reading data"}) //Ошибка при чтении данных
-			return nil
+			return nil, err
 		}
 		goods = append(goods, good) //добавляем извлеченные товары в наш срез
 	}
-	return nil
+	return goods, nil
 }
 
 func (g *GoodsUsecase) UpdateStore(c *gin.Context, id string, updatedGoods *footballstore) error {
