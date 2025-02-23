@@ -2,15 +2,13 @@ package usecase
 
 import (
 	"context"
-	"log"
-	"net/http"
+	"log/slog"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/shopspring/decimal"
 )
 
-type footballstore struct {
+type Footballstore struct {
 	ID       string          `json:"id"`       //объявление номера // serial primary key
 	Category string          `json:"category"` //категория товара: Одежда, обувь, аксессуары и тд.
 	Name     string          `json:"name"`     //название товара:форма, бутсы, брелки и тд.
@@ -25,66 +23,80 @@ func New(conn *pgx.Conn) *GoodsUsecase {
 	return &GoodsUsecase{conn: conn}
 }
 
-func (g *GoodsUsecase) ListStore(c *gin.Context) ([]footballstore, error) {
-	rows, err := g.conn.Query(context.Background(), `SELECT "id", "category", "name", "price" from "footballstore"`) //выполнение SQL запроса через соединение с бд
+func (g *GoodsUsecase) ListStore(ctx context.Context) ([]Footballstore, error) {
+	//выполнение SQL запроса через соединение с бд
+	rows, err := g.conn.Query(ctx, `SELECT "id", "category", "name", "price" from "footballstore"`)
 	if err != nil {
-		log.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when executing sql query"}) //ошибка при выполнении sql запроса
+		slog.Error("ListStore Query error", slog.Any("error", err))
 		return nil, err
 	}
 	defer rows.Close()
+	//создается срез
+	goods := []Footballstore{}
 
-	var goods []footballstore //создается срез
-
-	for rows.Next() { //метод, который используется для перебора строк
-		var good footballstore                                              //объявляем переменную good, чтобы хранить данные для каждой строки, которую мы считваем из бд
-		err := rows.Scan(&good.ID, &good.Category, &good.Name, &good.Price) //извлекаем данные из текущей струтуры базы данны(id, catogory ...) и присваиваем их полям структуры(&id, &category ...), чтобы можно было работать с этими данными
+	//метод, который используется для перебора строк
+	for rows.Next() {
+		//объявляем переменную good, чтобы хранить данные для каждой строки, которую мы считваем из бд
+		good := Footballstore{}
+		//извлекаем данные из текущей струтуры базы данны(id, catogory ...) и присваиваем их полям структуры(&id,
+		//&category ...), чтобы можно было работать с этими данными
+		err := rows.Scan(&good.ID, &good.Category, &good.Name, &good.Price)
 		if err != nil {
-			log.Println(err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error when reading data"}) //Ошибка при чтении данных
+			slog.Error("ListStore Scan error", slog.Any("error", err))
 			return nil, err
 		}
-		goods = append(goods, good) //добавляем извлеченные товары в наш срез
+		//добавляем извлеченные товары в наш срез
+		goods = append(goods, good)
 	}
 	return goods, nil
 }
 
-func (g *GoodsUsecase) UpdateStore(c *gin.Context, id string, updatedGoods *footballstore) error {
-	query := "UPDATE footballstore SET category = $1, name = $2, price = $3 WHERE id = $4"                               //обновляем данные через SQL
-	_, err := g.conn.Exec(context.Background(), query, updatedGoods.Category, updatedGoods.Name, updatedGoods.Price, id) //выполняем SQL запрос для обновления данных и присваиваем новые значения переменным
+func (g *GoodsUsecase) UpdateStore(ctx context.Context, good *Footballstore) error {
+	//обновляем данные через SQL
+	query := "UPDATE footballstore SET category = $1, name = $2, price = $3 WHERE id = $4"
+	//выполняем SQL запрос для обновления данных и присваиваем новые значения переменным
+	_, err := g.conn.Exec(ctx, query, good.Category, good.Name, good.Price)
 	if err != nil {
-		log.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error during the update"}) //ошибка при обнолении
+		slog.Error(" UpdateStore goods error", slog.Any("error", err))
 		return err
 	}
 	return nil
 }
 
-func (g *GoodsUsecase) GetGoodByID(id string, good *footballstore) error {
-	query := "SELECT id, name, category, price FROM footballstore WHERE id = $1" // выполняем SQL запрос, где выдается конкретный id, в данном случае 1
-	row := g.conn.QueryRow(context.Background(), query, id)                      //используется чтобы выдать только 1 строку, в данном случае  id строку
+func (g *GoodsUsecase) GetGoodByID(ctx context.Context, id string) (*Footballstore, error) {
+	// выполняем SQL запрос, где выдается конкретный id, в данном случае 1
+	query := "SELECT id, name, category, price FROM footballstore WHERE id = $1"
+	//используется чтобы выдать только 1 строку, в данном случае  id строку
+	row := g.conn.QueryRow(context.Background(), query, id)
 
-	err := row.Scan(&good.ID, &good.Category, &good.Name, &good.Price) //Метод Scan извлекает значения из результата запроса и присваивает их полям структуры good.
-	return err
+	good := Footballstore{}
+	//Метод Scan извлекает значения из результата запроса и присваивает их полям структуры good
+	err := row.Scan(&good.ID, &good.Category, &good.Name, &good.Price)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			//если не найдено, то возвращает nil
+			return nil, nil
+		}
+		slog.Error("GetGoodByID Scan error", slog.Any("error", err))
+		return nil, err
+	}
+	return &good, nil
 }
-
-func (g *GoodsUsecase) InsertStore(c *gin.Context, newGood *footballstore) error {
+func (g *GoodsUsecase) InsertStore(ctx context.Context, newGood *Footballstore) error {
 	query := "INSERT INTO footballstore (category, name, price) VALUES ($1, $2,  $3)"
-	_, err := g.conn.Exec(context.Background(), query, newGood.Category, newGood.Name, newGood.Price)
+	_, err := g.conn.Exec(ctx, query, newGood.Category, newGood.Name, newGood.Price)
 	if err != nil {
-		log.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "couldn't assign data"}) //не удалось присвоить данные
+		slog.Error("InsertStore error", slog.Any("error", err))
 		return err
 	}
 	return nil
 }
 
-func (g *GoodsUsecase) DeleteById(c *gin.Context, id string) error {
+func (g *GoodsUsecase) DeleteById(ctx context.Context, id string) error {
 	query := "DELETE FROM footballstore WHERE id = $1"
 	_, err := g.conn.Exec(context.Background(), query, id)
 	if err != nil {
-		log.Println(err)
-		c.JSON(http.StatusNotFound, gin.H{"Error": "id not found"})
+		slog.Error("DeleteByID Scan error", slog.Any("error", err))
 		return err
 	}
 	return nil
