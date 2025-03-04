@@ -1,0 +1,14 @@
+package repository
+
+import (
+	"context"
+	"example/web-service-gin/internal/models"
+)
+
+type GoodsProvider interface {
+	ListStore(ctx context.Context) ([]models.Footballstore, error)
+	UpdateStore(ctx context.Context, good *models.Footballstore) error
+	GetGoodByID(ctx context.Context, id string) (*models.Footballstore, error)
+	InsertStore(ctx context.Context, newGood *models.Footballstore) error
+	DeleteByID(ctx context.Context, id string) error
+}

@@ -1,8 +1,10 @@
+// обработчик HTTP-запросов для веб-сервиса, который взаимодействует с базой данных для управления товарами в магазине
 package handler
 
 import (
+	"example/web-service-gin/internal/models"
 	"example/web-service-gin/internal/usecase"
-	"log"
+
 	"log/slog"
 	"net/http"
 
@@ -10,10 +12,12 @@ import (
 )
 
 type Handle struct {
-	goodsUC *usecase.GoodsUsecase
+	// goodsUC это поле структуры Handle и это просто название. А usecase.GoodsProvider это тип поля goodsUC
+	//В данном случае это интерфейс, определенный в пакете usecase
+	goodsUC usecase.GoodsProvider
 }
 
-func New(goodsUC *usecase.GoodsUsecase) *Handle {
+func New(goodsUC usecase.GoodsProvider) *Handle {
 	return &Handle{goodsUC: goodsUC}
 }
 
@@ -23,7 +27,7 @@ func (h *Handle) ListStore(c *gin.Context) {
 	goods, err := h.goodsUC.ListStore(c)
 	//проверка на ошибку после перебора
 	if err != nil {
-		log.Println(err)
+		slog.Error("ListStore goods error", slog.Any("error", err))
 		//Ошибка после перербора товаров
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error after sorting through the items"})
 		return
@@ -35,7 +39,7 @@ func (h *Handle) ListStore(c *gin.Context) {
 // создаем эту ф-цию для обновления данных в магазине (в базе данных)
 func (h *Handle) UpdateStore(c *gin.Context) {
 	//создаем переменную updatedGoods чтобы хранить в ней обновленные товары
-	var updatedGoods usecase.Footballstore
+	updatedGoods := models.Footballstore{}
 	//считываем с помощью BindJSON новые данные которые отправил клиент и передаем их переменной updatedGoods
 	if err := c.BindJSON(&updatedGoods); err != nil {
 		slog.Error("UpdateStore BindJSON error", slog.Any("error", err))
@@ -60,12 +64,17 @@ func (h *Handle) GetGoodByID(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Good not found"})
 		return
 	}
+	if good != nil {
+		slog.Error("Good not found", slog.Any("error", err))
+		c.JSON(http.StatusNotFound, gin.H{"error": "Good not found"})
+		return
+	}
 	c.JSON(http.StatusOK, good)
 }
 
 // добавляем новую запись в бд
 func (h *Handle) InsertStore(c *gin.Context) {
-	var newGood usecase.Footballstore
+	newGood := models.Footballstore{}
 	//считываем json данные и присваиваем их переменной newGood
 	if err := c.BindJSON(&newGood); err != nil {
 		slog.Error("InsertStore BindJSON error", slog.Any("error", err))
