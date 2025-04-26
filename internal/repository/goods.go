@@ -70,13 +70,13 @@ func (g *GoodsRepo) GetGoodByID(ctx context.Context, id int) (*models.Footballst
 	// выполняем SQL запрос, где выдается конкретный id, в данном случае 1
 	query := "SELECT id, name, category, price FROM Footballstore WHERE id = $1"
 	//используется чтобы выдать только 1 строку, в данном случае  id строку
-	row := g.conn.QueryRow(context.Background(), query, id)
+	row := g.conn.QueryRow(ctx, query, id)
 
 	good := models.Footballstore{}
 	//Метод Scan извлекает значения из результата запроса и присваивает их полям структуры good
 	err := row.Scan(&good.ID, &good.Category, &good.Name, &good.Price)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			//если не найдено, то возвращает nil
 			return nil, apper.ErrNotFound
 		}
