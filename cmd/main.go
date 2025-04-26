@@ -7,13 +7,33 @@ import (
 	"example/web-service-gin/internal/router"
 	"example/web-service-gin/internal/storage"
 	"example/web-service-gin/internal/usecase"
+	"fmt"
 	"log"
+	"os"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	//загрузка переменных окружения из .env файла
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatalf("Ошибка при загрузке данных из .env файла: %v", err)
+	}
+
+	//Получение переменных окружения
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+
+	//Формирование строки подключения к базе данных
+	connStr := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
+
 	//присваиваем переменной Conn значение соединения
 	//вызывается ф-ция GetConnect из пакета storage, которая устанавливает соединение с бд
-	conn, err := storage.GetConnect("postgresql://postgres:@postgres:5432/postgres")
+	conn, err := storage.GetConnect(connStr)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v\n", err)
 	}
@@ -32,7 +52,13 @@ func main() {
 	//Создает новый роутер (маршрутизатор) для обработки HTTP-запросов
 	router := router.GetRouter(handle)
 
-	//запускаем сервер на localhost с портом 8080
-	router.Run("0.0.0.0:8080")
+	//Получаем переменную окружения
+	appPort := os.Getenv("APP_PORT")
 
+	//запуск сервера на указанном хосте и порту
+	log.Printf("Запуск сервера на 0.0.0.0:%s\n", appPort)
+	err = router.Run("0.0.0.0" + appPort)
+	if err != nil {
+		log.Fatalf("Ошибка при запуске сервера: %v", err)
+	}
 }

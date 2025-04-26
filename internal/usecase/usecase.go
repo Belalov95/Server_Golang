@@ -20,11 +20,11 @@ func (g *GoodsUsecase) ListStore(ctx context.Context) ([]models.Footballstore, e
 	return g.goodsRepo.ListStore(ctx)
 }
 
-func (g *GoodsUsecase) UpdateStore(ctx context.Context, good *models.Footballstore) error {
-	return g.goodsRepo.UpdateStore(ctx, good)
+func (g *GoodsUsecase) UpdateStore(ctx context.Context, updatedGoods *models.Footballstore) error {
+	return g.goodsRepo.UpdateStore(ctx, updatedGoods)
 }
 
-func (g *GoodsUsecase) GetGoodByID(ctx context.Context, id string) (*models.Footballstore, error) {
+func (g *GoodsUsecase) GetGoodByID(ctx context.Context, id int) (*models.Footballstore, error) {
 	return g.goodsRepo.GetGoodByID(ctx, id)
 }
 func (g *GoodsUsecase) InsertStore(ctx context.Context, newGood *models.Footballstore) error {
