@@ -4,11 +4,13 @@ package main
 import (
 	"context"
 	"example/web-service-gin/internal/handler"
+	"example/web-service-gin/internal/repository"
 	"example/web-service-gin/internal/router"
 	"example/web-service-gin/internal/storage"
 	"example/web-service-gin/internal/usecase"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -18,7 +20,7 @@ func main() {
 	//загрузка переменных окружения из .env файла
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Fatalf("Ошибка при загрузке данных из .env файла: %v", err)
+		slog.Error("Ошибка при загрузке данных из .env файла: %v", slog.Any("error", err))
 	}
 
 	//Получение переменных окружения
@@ -35,15 +37,18 @@ func main() {
 	//вызывается ф-ция GetConnect из пакета storage, которая устанавливает соединение с бд
 	conn, err := storage.GetConnect(connStr)
 	if err != nil {
-		log.Fatalf("Unable to connect to database: %v\n", err)
+		slog.Error("Unable to connect to database: %v\n", slog.Any("error", err))
 	}
 	//Эта строка использует ключевое слово defer, чтобы отложить выполнение функции Close до тех пор,
 	// пока функция main не завершит выполнение. Это гарантирует, что соединение с базой данных будет закрыто,
 	// даже если произойдет ошибка.
 	defer conn.Close(context.Background())
 
+	repo := repository.New(conn)
+
+	cacheProvider := cache.NewDecorator(repo)
 	//Создает новый экземпляр бизнес логики (usecase) и передает ему соединение с бд
-	uc := usecase.New(conn)
+	uc := usecase.New(cacheProvider)
 
 	//Создает новый обработчик HTTP-запросов (handler), передавая ему экземпляр бизнес логики (uc)
 	//Обработчик будет использовать бизнес логику для обработки запросов от клиентов
@@ -59,6 +64,6 @@ func main() {
 	log.Printf("Запуск сервера на 0.0.0.0:%s\n", appPort)
 	err = router.Run("0.0.0.0" + appPort)
 	if err != nil {
-		log.Fatalf("Ошибка при запуске сервера: %v", err)
+		slog.Error("Ошибка при запуске сервера: %v", slog.Any("error", err))
 	}
 }

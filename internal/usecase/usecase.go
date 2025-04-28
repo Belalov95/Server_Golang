@@ -4,16 +4,14 @@ import (
 	"context"
 	"example/web-service-gin/internal/models"
 	"example/web-service-gin/internal/repository"
-
-	"github.com/jackc/pgx/v5"
 )
 
 type GoodsUsecase struct {
-	goodsRepo *repository.GoodsRepo
+	goodsRepo repository.GoodsProvider
 }
 
-func New(conn *pgx.Conn) *GoodsUsecase {
-	return &GoodsUsecase{goodsRepo: repository.NewGoodsRepo(conn)}
+func New(goodsRepo repository.GoodsProvider) *GoodsUsecase {
+	return &GoodsUsecase{goodsRepo: goodsRepo}
 }
 
 func (g *GoodsUsecase) ListStore(ctx context.Context) ([]models.Footballstore, error) {
@@ -24,8 +22,8 @@ func (g *GoodsUsecase) UpdateStore(ctx context.Context, updatedGoods *models.Foo
 	return g.goodsRepo.UpdateStore(ctx, updatedGoods)
 }
 
-func (g *GoodsUsecase) GetGoodByID(ctx context.Context, id int) (*models.Footballstore, error) {
-	return g.goodsRepo.GetGoodByID(ctx, id)
+func (g *GoodsUsecase) GetGoodByID(ctx context.Context, idStr string) (*models.Footballstore, error) {
+	return g.goodsRepo.GetGoodByID(ctx, idStr)
 }
 func (g *GoodsUsecase) InsertStore(ctx context.Context, newGood *models.Footballstore) error {
 	return g.goodsRepo.InsertStore(ctx, newGood)

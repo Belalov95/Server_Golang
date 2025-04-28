@@ -29,8 +29,7 @@ func (h *Handle) ListStore(c *gin.Context) {
 	dbGoods, err := h.goodsUC.ListStore(c)
 	//проверка на ошибку после перебора
 	if err != nil {
-		wrappedErr := errors.Wrap(err, "failed to list goods in Liststore")
-		slog.Error("ListStore goods error", slog.Any("error", wrappedErr))
+		slog.Error("ListStore goods error", slog.Any("error", err))
 		//Ошибка после перербора товаров
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error after sorting through the items"})
 		return
@@ -56,8 +55,7 @@ func (h *Handle) UpdateStore(c *gin.Context) {
 	updatedGoods := models.UpdateGoodRequest{}
 	//считываем с помощью BindJSON новые данные которые отправил клиент и передаем их переменной updatedGoods
 	if err := c.BindJSON(&updatedGoods); err != nil {
-		wrappedErr := errors.Wrap(err, "failed to bind JSON in UpdateStore")
-		slog.Error("UpdateStore BindJSON error", slog.Any("error", wrappedErr))
+		slog.Error("UpdateStore BindJSON error", slog.Any("error", err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "error unconnecting data"})
 		return
 	}
@@ -69,8 +67,7 @@ func (h *Handle) UpdateStore(c *gin.Context) {
 	}
 	//Вызываем UseCase для обновления данных в базе
 	if err := h.goodsUC.UpdateStore(c, &dbModel); err != nil {
-		wrappedErr := errors.Wrap(err, "failed to update store in UpdateStore")
-		slog.Error("UpdateStore uc.Updatestore error", slog.Any("error", wrappedErr))
+		slog.Error("UpdateStore uc.Updatestore error", slog.Any("error", err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "error unconnecting data"})
 		return
 	}
@@ -81,20 +78,19 @@ func (h *Handle) UpdateStore(c *gin.Context) {
 // создается для поиска товара по его id
 func (h *Handle) GetGoodByID(c *gin.Context) {
 	//создаем для поиска товара по id
-	idStr := c.Param("id")
+	id := c.Param("id")
 
 	//Преобразовываем строку в целое число
-	id, err := strconv.Atoi(idStr)
-	if err != nil || id <= 0 {
+	idStr, err := strconv.Atoi(id)
+	if err != nil || idStr <= 0 {
 		wrappedErr := errors.Wrap(err, "invalid ID in GetGoodByID")
 		slog.Error("Invalid ID", slog.Any("error", wrappedErr))
-		c.JSON(http.StatusNotFound, gin.H{"error": "Invalid ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 		return
 	}
 	good, err := h.goodsUC.GetGoodByID(c, id)
 	if err != nil {
-		wrappedErr := errors.Wrap(err, "failed to get good by ID in GetGoodByID")
-		slog.Error("GetGoodByID error", slog.Int("id", id), slog.Any("error", wrappedErr))
+		slog.Error("GetGoodByID error", slog.Int("id", idStr), slog.Any("error", err))
 		c.JSON(http.StatusNotFound, gin.H{"error": "Good not found"})
 		return
 	}
@@ -116,8 +112,7 @@ func (h *Handle) InsertStore(c *gin.Context) {
 	newGood := models.CreateGoodRequest{}
 	//считываем json данные и присваиваем их переменной newGood
 	if err := c.BindJSON(&newGood); err != nil {
-		wrappedErr := errors.Wrap(err, "failed to bind JSON in InsertStore")
-		slog.Error("InsertStore BindJSON error", slog.Any("error", wrappedErr))
+		slog.Error("InsertStore BindJSON error", slog.Any("error", err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't assign data"})
 		return
 	}
@@ -127,8 +122,7 @@ func (h *Handle) InsertStore(c *gin.Context) {
 		Price:    newGood.Price,
 	}
 	if err := h.goodsUC.InsertStore(c, &dbModel); err != nil {
-		wrappedErr := errors.Wrap(err, "failed to insert store in InsertStore")
-		slog.Error("InsertStore error", slog.Any("error", wrappedErr))
+		slog.Error("InsertStore error", slog.Any("error", err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't assign data"})
 		return
 	}
@@ -139,8 +133,7 @@ func (h *Handle) InsertStore(c *gin.Context) {
 func (h *Handle) DeleteById(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.goodsUC.DeleteById(c, id); err != nil {
-		wrappedErr := errors.Wrap(err, "failed to delete good by ID in DeleteById")
-		slog.Error("DeleteById error", slog.Any("error", wrappedErr))
+		slog.Error("DeleteById error", slog.Any("error", err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't assign data"})
 		return
 	}

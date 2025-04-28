@@ -1,9 +1,8 @@
 package repository
 
 import (
-	"example/web-service-gin/internal/apper"
+	"example/web-service-gin/internal/apperr"
 	"example/web-service-gin/internal/models"
-	"log/slog"
 
 	"github.com/pkg/errors"
 
@@ -20,10 +19,9 @@ func NewGoodsRepo(conn *pgx.Conn) *GoodsRepo {
 }
 func (g *GoodsRepo) ListStore(ctx context.Context) ([]models.Footballstore, error) {
 	//выполнение SQL запроса через соединение с бд
-	rows, err := g.conn.Query(ctx, `SELECT "id", "category", "name", "price" FROM "footballstore"`)
+	rows, err := g.conn.Query(ctx, `SELECT id, category, name, price FROM footballstore`)
 	if err != nil {
 		wrappedErr := errors.Wrap(err, "failed to execute query in ListStore")
-		slog.Error("ListStore Query error", slog.Any("error", wrappedErr))
 		return nil, wrappedErr
 	}
 	defer rows.Close()
@@ -38,19 +36,14 @@ func (g *GoodsRepo) ListStore(ctx context.Context) ([]models.Footballstore, erro
 		//&category ...), чтобы можно было работать с этими данными
 		err := rows.Scan(&good.ID, &good.Category, &good.Name, &good.Price)
 		if err != nil {
-			wrappedErr := errors.Wrap(err, "failed to scan row in ListStore")
-			slog.Error("ListStore Scan error", slog.Any("error", wrappedErr))
-			return nil, wrappedErr
+			return nil, errors.Wrap(err, "failed to scan row in ListStore")
 		}
 		//добавляем извлеченные товары в наш срез
 		goods = append(goods, good)
 	}
 	// Проверяем, не возникло ли ошибок при переборе строк
 	if err := rows.Err(); err != nil {
-		// Добавляем контекст к ошибке и логируем её
-		wrappedErr := errors.Wrap(err, "rows iteration error in ListStore")
-		slog.Error("ListStore Rows error", slog.Any("error", wrappedErr))
-		return nil, wrappedErr
+		return nil, errors.Wrap(err, "rows iteration error in ListStore")
 	}
 	return goods, nil
 }
@@ -60,9 +53,7 @@ func (g *GoodsRepo) UpdateStore(ctx context.Context, updatedGoods *models.Footba
 	//выполняем SQL запрос для обновления данных и присваиваем новые значения переменным
 	_, err := g.conn.Exec(ctx, query, updatedGoods.ID, updatedGoods.Category, updatedGoods.Name, updatedGoods.Price)
 	if err != nil {
-		wrappedErr := errors.Wrap(err, "failed to update goods in UpdateStore")
-		slog.Error(" UpdateStore goods error", slog.Any("error", wrappedErr))
-		return wrappedErr
+		return errors.Wrap(err, "failed to update goods in UpdateStore")
 	}
 	return nil
 }
@@ -78,11 +69,9 @@ func (g *GoodsRepo) GetGoodByID(ctx context.Context, id int) (*models.Footballst
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			//если не найдено, то возвращает nil
-			return nil, apper.ErrNotFound
+			return nil, apperr.ErrNotFound
 		}
-		wrappedErr := errors.Wrap(err, "failed to scan row in GetGoodByID")
-		slog.Error("GetGoodByID Scan error", slog.Any("error", wrappedErr))
-		return nil, wrappedErr
+		return nil, errors.Wrap(err, "failed to scan row in GetGoodByID")
 	}
 	return &good, nil
 }
@@ -90,9 +79,7 @@ func (g *GoodsRepo) InsertStore(ctx context.Context, newGood *models.Footballsto
 	query := "INSERT INTO footballstore (category, name, price) VALUES ($1, $2,  $3)"
 	_, err := g.conn.Exec(ctx, query, newGood.Category, newGood.Name, newGood.Price)
 	if err != nil {
-		wrappedErr := errors.Wrap(err, "failed to insert new good in InsertStore")
-		slog.Error("InsertStore error", slog.Any("error", wrappedErr))
-		return wrappedErr
+		return errors.Wrap(err, "failed to insert new good in InsertStore")
 	}
 	return nil
 }
@@ -100,9 +87,7 @@ func (g *GoodsRepo) DeleteByID(ctx context.Context, id string) error {
 	query := "DELETE FROM footballstore WHERE id = $1"
 	_, err := g.conn.Exec(context.Background(), query, id)
 	if err != nil {
-		wrappedErr := errors.Wrap(err, "failed to delete good by ID in DeleteByID")
-		slog.Error("DeleteByID Scan error", slog.Any("error", wrappedErr))
-		return wrappedErr
+		return errors.Wrap(err, "failed to delete good by ID in DeleteByID")
 	}
 	return nil
 }
