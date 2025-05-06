@@ -2,6 +2,7 @@
 package handler
 
 import (
+	"example/web-service-gin/internal/apperr"
 	"example/web-service-gin/internal/models"
 	"example/web-service-gin/internal/usecase"
 	"strconv"
@@ -23,17 +24,7 @@ func New(goodsUC usecase.GoodsProvider) *Handle {
 	return &Handle{goodsUC: goodsUC}
 }
 
-// создается для получения данных из таблицы бд
-func (h *Handle) ListStore(c *gin.Context) {
-	//присваиваем переменной dbGoods список товаров
-	dbGoods, err := h.goodsUC.ListStore(c)
-	//проверка на ошибку после перебора
-	if err != nil {
-		slog.Error("ListStore goods error", slog.Any("error", err))
-		//Ошибка после перербора товаров
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error after sorting through the items"})
-		return
-	}
+func ToResponse(c *gin.Context, dbGoods []models.Footballstore) {
 	//Преобразовываем данные из модели базы данных в структуру Response, чтобы вывести клиенту именно те данные из
 	//базы, которые нужны ему
 	var goods []models.GoodResponse
@@ -49,6 +40,31 @@ func (h *Handle) ListStore(c *gin.Context) {
 	c.JSON(http.StatusOK, goods)
 }
 
+// создается для получения данных из таблицы бд
+func (h *Handle) ListStore(c *gin.Context) {
+	//присваиваем переменной dbGoods список товаров
+	dbGoods, err := h.goodsUC.ListStore(c)
+	//проверка на ошибку после перебора
+	if err != nil {
+		slog.Error("ListStore goods error", slog.Any("error", err))
+		//Ошибка после перербора товаров
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error after sorting through the items"})
+		return
+	}
+	ToResponse(c, dbGoods)
+}
+
+func updatedGoodsTDO(updatedGoods models.UpdateGoodRequest) models.Footballstore {
+	dbModel := models.Footballstore{
+		ID:       updatedGoods.ID,
+		Category: updatedGoods.Category,
+		Name:     updatedGoods.Name,
+		Price:    updatedGoods.Price,
+	}
+	//ретерним чтобы возвращалось значение и мы могли использовать эту функцию
+	return dbModel
+}
+
 // создаем эту ф-цию для обновления данных в магазине (в базе данных)
 func (h *Handle) UpdateStore(c *gin.Context) {
 	//создаем переменную updatedGoods чтобы хранить в ней обновленные товары
@@ -59,12 +75,9 @@ func (h *Handle) UpdateStore(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "error unconnecting data"})
 		return
 	}
-	dbModel := models.Footballstore{
-		ID:       updatedGoods.ID,
-		Category: updatedGoods.Category,
-		Name:     updatedGoods.Name,
-		Price:    updatedGoods.Price,
-	}
+	//обновляем dbModel с помощью updatedGoodsTDO и объявляем переменную чтобы в дальнейшем использовать ее
+	dbModel := updatedGoodsTDO(updatedGoods)
+
 	//Вызываем UseCase для обновления данных в базе
 	if err := h.goodsUC.UpdateStore(c, &dbModel); err != nil {
 		slog.Error("UpdateStore uc.Updatestore error", slog.Any("error", err))
@@ -90,14 +103,17 @@ func (h *Handle) GetGoodByID(c *gin.Context) {
 	}
 	good, err := h.goodsUC.GetGoodByID(c, id)
 	if err != nil {
+		if errors.Is(err, apperr.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "404 Not Found"})
+			return
+		}
+		//логируем ошибку
 		slog.Error("GetGoodByID error", slog.Int("id", idStr), slog.Any("error", err))
-		c.JSON(http.StatusNotFound, gin.H{"error": "Good not found"})
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "500 Internal Server Error"})
 		return
 	}
-	if good == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Good not found"})
-		return
-	}
+
 	resp := models.GoodResponse{
 		ID:       good.ID,
 		Category: good.Category,

@@ -3,6 +3,8 @@ package repository
 import (
 	"example/web-service-gin/internal/apperr"
 	"example/web-service-gin/internal/models"
+	"fmt"
+	"log/slog"
 
 	"github.com/pkg/errors"
 
@@ -51,13 +53,22 @@ func (g *GoodsRepo) UpdateStore(ctx context.Context, updatedGoods *models.Footba
 	//обновляем данные через SQL
 	query := "UPDATE footballstore SET category = $1, name = $2, price = $3 WHERE id = $4"
 	//выполняем SQL запрос для обновления данных и присваиваем новые значения переменным
-	_, err := g.conn.Exec(ctx, query, updatedGoods.ID, updatedGoods.Category, updatedGoods.Name, updatedGoods.Price)
+	result, err := g.conn.Exec(ctx, query, updatedGoods.ID, updatedGoods.Category, updatedGoods.Name, updatedGoods.Price)
 	if err != nil {
 		return errors.Wrap(err, "failed to update goods in UpdateStore")
 	}
+	rowsAffected := result.RowsAffected()
+	if err != nil {
+		slog.Error("Error getting rows affected:", slog.Any("error", err))
+	}
+	if rowsAffected == 0 {
+		fmt.Println("No rows were affected by the query.")
+	} else {
+		fmt.Println("Number of rows updated: %d\n", rowsAffected)
+	}
 	return nil
 }
-func (g *GoodsRepo) GetGoodByID(ctx context.Context, id int) (*models.Footballstore, error) {
+func (g *GoodsRepo) GetGoodByID(ctx context.Context, id string) (*models.Footballstore, error) {
 	// выполняем SQL запрос, где выдается конкретный id, в данном случае 1
 	query := "SELECT id, name, category, price FROM Footballstore WHERE id = $1"
 	//используется чтобы выдать только 1 строку, в данном случае  id строку

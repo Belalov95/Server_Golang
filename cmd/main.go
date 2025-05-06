@@ -3,36 +3,22 @@ package main
 
 import (
 	"context"
+	"example/web-service-gin/internal/cache"
+	"example/web-service-gin/internal/config"
 	"example/web-service-gin/internal/handler"
 	"example/web-service-gin/internal/repository"
 	"example/web-service-gin/internal/router"
 	"example/web-service-gin/internal/storage"
 	"example/web-service-gin/internal/usecase"
+
 	"fmt"
 	"log"
 	"log/slog"
 	"os"
-
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	//загрузка переменных окружения из .env файла
-	err := godotenv.Load(".env")
-	if err != nil {
-		slog.Error("Ошибка при загрузке данных из .env файла: %v", slog.Any("error", err))
-	}
-
-	//Получение переменных окружения
-	dbUser := os.Getenv("DB_USER")
-	dbPassword := os.Getenv("DB_PASSWORD")
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbName := os.Getenv("DB_NAME")
-
-	//Формирование строки подключения к базе данных
-	connStr := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
-
+	connStr := config.NewConfig()
 	//присваиваем переменной Conn значение соединения
 	//вызывается ф-ция GetConnect из пакета storage, которая устанавливает соединение с бд
 	conn, err := storage.GetConnect(connStr)
@@ -44,9 +30,9 @@ func main() {
 	// даже если произойдет ошибка.
 	defer conn.Close(context.Background())
 
-	repo := repository.New(conn)
+	repo := repository.NewGoodsRepo(conn)
 
-	cacheProvider := cache.NewDecorator(repo)
+	cacheProvider := cache.New(repo)
 	//Создает новый экземпляр бизнес логики (usecase) и передает ему соединение с бд
 	uc := usecase.New(cacheProvider)
 
@@ -62,8 +48,7 @@ func main() {
 
 	//запуск сервера на указанном хосте и порту
 	log.Printf("Запуск сервера на 0.0.0.0:%s\n", appPort)
-	err = router.Run("0.0.0.0" + appPort)
-	if err != nil {
+	if err := router.Run(fmt.Sprintf(":%s", appPort)); err != nil {
 		slog.Error("Ошибка при запуске сервера: %v", slog.Any("error", err))
 	}
 }

@@ -2,10 +2,25 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
+
+	"github.com/joho/godotenv"
 )
 
-func main() {
+type Config struct {
+	App struct {
+		Port string
+	}
+}
+
+func NewConfig() string {
+	//загрузка переменных окружения из .env файла
+	err := godotenv.Load(".env")
+	if err != nil {
+		slog.Error("Ошибка при загрузке данных из .env файла: %v", slog.Any("error", err))
+	}
+
 	//Получение переменных окружения
 	dbUser := os.Getenv("DB_USER")
 	dbPassword := os.Getenv("DB_PASSWORD")
@@ -15,4 +30,5 @@ func main() {
 
 	//Формирование строки подключения к базе данных
 	connStr := fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
+	return connStr
 }
