@@ -5,12 +5,12 @@ import (
 	"example/web-service-gin/internal/apperr"
 	"example/web-service-gin/internal/models"
 	"example/web-service-gin/internal/usecase"
-	"strconv"
 
 	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
 )
 
@@ -24,22 +24,6 @@ func New(goodsUC usecase.GoodsProvider) *Handle {
 	return &Handle{goodsUC: goodsUC}
 }
 
-func ToResponse(c *gin.Context, dbGoods []models.Footballstore) {
-	//Преобразовываем данные из модели базы данных в структуру Response, чтобы вывести клиенту именно те данные из
-	//базы, которые нужны ему
-	var goods []models.GoodResponse
-	for _, dbGood := range dbGoods {
-		goods = append(goods, models.GoodResponse{
-			ID:       dbGood.ID,
-			Category: dbGood.Category,
-			Name:     dbGood.Name,
-			Price:    dbGood.Price,
-		})
-	}
-	//отправляем список товаров в формате JSON
-	c.JSON(http.StatusOK, goods)
-}
-
 // создается для получения данных из таблицы бд
 func (h *Handle) ListStore(c *gin.Context) {
 	//присваиваем переменной dbGoods список товаров
@@ -51,32 +35,38 @@ func (h *Handle) ListStore(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error after sorting through the items"})
 		return
 	}
-	ToResponse(c, dbGoods)
-}
-
-func updatedGoodsTDO(updatedGoods models.UpdateGoodRequest) models.Footballstore {
-	dbModel := models.Footballstore{
-		ID:       updatedGoods.ID,
-		Category: updatedGoods.Category,
-		Name:     updatedGoods.Name,
-		Price:    updatedGoods.Price,
-	}
-	//ретерним чтобы возвращалось значение и мы могли использовать эту функцию
-	return dbModel
+	resp := models.ToResponse(dbGoods) //goods содержит результат функции toresponse
+	//отправляем список товаров в формате JSON
+	c.JSON(http.StatusOK, resp)
+	return
 }
 
 // создаем эту ф-цию для обновления данных в магазине (в базе данных)
 func (h *Handle) UpdateStore(c *gin.Context) {
+	id := c.Param("id")
 	//создаем переменную updatedGoods чтобы хранить в ней обновленные товары
 	updatedGoods := models.UpdateGoodRequest{}
 	//считываем с помощью BindJSON новые данные которые отправил клиент и передаем их переменной updatedGoods
 	if err := c.BindJSON(&updatedGoods); err != nil {
 		slog.Error("UpdateStore BindJSON error", slog.Any("error", err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "error unconnecting data"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "error unconnecting data"})
 		return
 	}
+
+	//устанавливаем ID из URL в структуру обновления
+	updatedGoods.ID = id
+	// валидация
+	if err := models.ValidateStruct(updatedGoods); err != nil {
+		errors := make(map[string]string)
+		for _, fieldErr := range err.(validator.ValidationErrors) {
+			errors[fieldErr.Field()] = fieldErr.Tag() //записываем в мапу где fied - name, price ... и tag - required, gt ...
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"validation error": errors})
+		return
+	}
+
 	//обновляем dbModel с помощью updatedGoodsTDO и объявляем переменную чтобы в дальнейшем использовать ее
-	dbModel := updatedGoodsTDO(updatedGoods)
+	dbModel := models.UpdatedGoodsDTO(updatedGoods)
 
 	//Вызываем UseCase для обновления данных в базе
 	if err := h.goodsUC.UpdateStore(c, &dbModel); err != nil {
@@ -86,6 +76,7 @@ func (h *Handle) UpdateStore(c *gin.Context) {
 	}
 	//отправляем клиенту ответ об успешном обновлении
 	c.JSON(http.StatusOK, gin.H{"message": "The good has been successfully updated"})
+	return
 }
 
 // создается для поиска товара по его id
@@ -93,27 +84,19 @@ func (h *Handle) GetGoodByID(c *gin.Context) {
 	//создаем для поиска товара по id
 	id := c.Param("id")
 
-	//Преобразовываем строку в целое число
-	idStr, err := strconv.Atoi(id)
-	if err != nil || idStr <= 0 {
-		wrappedErr := errors.Wrap(err, "invalid ID in GetGoodByID")
-		slog.Error("Invalid ID", slog.Any("error", wrappedErr))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
-		return
-	}
-	good, err := h.goodsUC.GetGoodByID(c, id)
+	good, err := h.goodsUC.GetGoodByID(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, apperr.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "404 Not Found"})
 			return
 		}
 		//логируем ошибку
-		slog.Error("GetGoodByID error", slog.Int("id", idStr), slog.Any("error", err))
-
+		slog.Error("GetGoodByID error", slog.String("id", id), slog.Any("error", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "500 Internal Server Error"})
 		return
 	}
 
+	//преобразовываем товар в формат ответа
 	resp := models.GoodResponse{
 		ID:       good.ID,
 		Category: good.Category,
@@ -121,6 +104,7 @@ func (h *Handle) GetGoodByID(c *gin.Context) {
 		Price:    good.Price,
 	}
 	c.JSON(http.StatusOK, resp)
+	return
 }
 
 // добавляем новую запись в бд
@@ -132,6 +116,17 @@ func (h *Handle) InsertStore(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't assign data"})
 		return
 	}
+
+	//валидация
+	if err := models.ValidateStruct(newGood); err != nil {
+		errors := make(map[string]string)
+		for _, fieldErr := range err.(validator.ValidationErrors) {
+			errors[fieldErr.Field()] = fieldErr.Tag()
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"validation error": errors})
+		return
+	}
+
 	dbModel := models.Footballstore{
 		Category: newGood.Category,
 		Name:     newGood.Name,
@@ -143,6 +138,7 @@ func (h *Handle) InsertStore(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "The good added successfully"})
+	return
 }
 
 // Удаляем товар
@@ -154,4 +150,5 @@ func (h *Handle) DeleteById(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "The good has been deleated"})
+	return
 }

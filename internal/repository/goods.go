@@ -3,7 +3,6 @@ package repository
 import (
 	"example/web-service-gin/internal/apperr"
 	"example/web-service-gin/internal/models"
-	"fmt"
 	"log/slog"
 
 	"github.com/pkg/errors"
@@ -21,7 +20,7 @@ func NewGoodsRepo(conn *pgx.Conn) *GoodsRepo {
 }
 func (g *GoodsRepo) ListStore(ctx context.Context) ([]models.Footballstore, error) {
 	//выполнение SQL запроса через соединение с бд
-	rows, err := g.conn.Query(ctx, `SELECT id, category, name, price FROM footballstore`)
+	rows, err := g.conn.Query(ctx, `SELECT id, category, name, price FROM footballstore ORDER BY id`)
 	if err != nil {
 		wrappedErr := errors.Wrap(err, "failed to execute query in ListStore")
 		return nil, wrappedErr
@@ -57,20 +56,17 @@ func (g *GoodsRepo) UpdateStore(ctx context.Context, updatedGoods *models.Footba
 	if err != nil {
 		return errors.Wrap(err, "failed to update goods in UpdateStore")
 	}
-	rowsAffected := result.RowsAffected()
-	if err != nil {
-		slog.Error("Error getting rows affected:", slog.Any("error", err))
-	}
+	rowsAffected := result.RowsAffected() //получаем количество измененных строк
 	if rowsAffected == 0 {
-		fmt.Println("No rows were affected by the query.")
+		return apperr.ErrNotFound
 	} else {
-		fmt.Println("Number of rows updated: %d\n", rowsAffected)
+		slog.Debug("Number of rows updated:", "count", rowsAffected)
 	}
 	return nil
 }
 func (g *GoodsRepo) GetGoodByID(ctx context.Context, id string) (*models.Footballstore, error) {
 	// выполняем SQL запрос, где выдается конкретный id, в данном случае 1
-	query := "SELECT id, name, category, price FROM Footballstore WHERE id = $1"
+	query := "SELECT id, name, category, price FROM footballstore WHERE id = $1"
 	//используется чтобы выдать только 1 строку, в данном случае  id строку
 	row := g.conn.QueryRow(ctx, query, id)
 
@@ -96,7 +92,7 @@ func (g *GoodsRepo) InsertStore(ctx context.Context, newGood *models.Footballsto
 }
 func (g *GoodsRepo) DeleteByID(ctx context.Context, id string) error {
 	query := "DELETE FROM footballstore WHERE id = $1"
-	_, err := g.conn.Exec(context.Background(), query, id)
+	_, err := g.conn.Exec(ctx, query, id)
 	if err != nil {
 		return errors.Wrap(err, "failed to delete good by ID in DeleteByID")
 	}
