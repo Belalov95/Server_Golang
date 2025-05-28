@@ -82,7 +82,7 @@ func (h *Handle) UpdateStore(c *gin.Context) {
 // создается для поиска товара по его id
 func (h *Handle) GetGoodByID(c *gin.Context) {
 	//создаем для поиска товара по id
-	id := c.Param("id")
+	id := c.Param("id") //добавить везде debug
 
 	good, err := h.goodsUC.GetGoodByID(c.Request.Context(), id)
 	if err != nil {
