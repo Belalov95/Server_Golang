@@ -2,13 +2,13 @@ package metrics
 
 import (
 	"example/web-service-gin/internal/cache"
+	"log/slog"
 	"net/http"
 	"runtime"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/zap"
 )
 
 var (
@@ -50,9 +50,9 @@ func InitMetrics(port string, cache *cache.CacheDecorator) {
 			WriteTimeout: 10 * time.Second,  //максимальное время отправки ответа
 			IdleTimeout:  120 * time.Second, //максимальное время простоя между запросами
 		}
-		zap.S().Info("Starting metrics server on port", port)
+		slog.Info("Starting metrics server on port:", port)
 		if err := server.ListenAndServe(); err != nil {
-			zap.S().Fatal("Failed to start metrics:", err)
+			slog.Error("Failed to start metrics:", err)
 		}
 	}()
 }

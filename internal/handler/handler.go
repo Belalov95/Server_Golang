@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
 )
 
 type Handle struct {
@@ -26,8 +27,14 @@ func New(goodsUC usecase.GoodsProvider) *Handle {
 
 // создается для получения данных из таблицы бд
 func (h *Handle) ListStore(c *gin.Context) {
+	//создаем трейсер с названием сервера
+	tr := otel.Tracer("api-gateway")
+	//создаем span (отрезок времени который показывает сколько времени заняла операция в коде)
+	ctx, span := tr.Start(c.Request.Context(), "handler.ListStore")
+	defer span.End()
+
 	//присваиваем переменной dbGoods список товаров
-	dbGoods, err := h.goodsUC.ListStore(c)
+	dbGoods, err := h.goodsUC.ListStore(ctx)
 	//проверка на ошибку после перебора
 	if err != nil {
 		slog.Error("ListStore goods error", slog.Any("error", err))
@@ -43,6 +50,10 @@ func (h *Handle) ListStore(c *gin.Context) {
 
 // создаем эту ф-цию для обновления данных в магазине (в базе данных)
 func (h *Handle) UpdateStore(c *gin.Context) {
+	tr := otel.Tracer("api-gateway")
+	ctx, span := tr.Start(c.Request.Context(), "handler.UpdateStore")
+	defer span.End()
+
 	id := c.Param("id")
 	//создаем переменную updatedGoods чтобы хранить в ней обновленные товары
 	updatedGoods := models.UpdateGoodRequest{}
@@ -69,7 +80,7 @@ func (h *Handle) UpdateStore(c *gin.Context) {
 	dbModel := models.UpdatedGoodsDTO(updatedGoods)
 
 	//Вызываем UseCase для обновления данных в базе
-	if err := h.goodsUC.UpdateStore(c, &dbModel); err != nil {
+	if err := h.goodsUC.UpdateStore(ctx, &dbModel); err != nil {
 		slog.Error("UpdateStore uc.Updatestore error", slog.Any("error", err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "error unconnecting data"})
 		return
@@ -81,10 +92,14 @@ func (h *Handle) UpdateStore(c *gin.Context) {
 
 // создается для поиска товара по его id
 func (h *Handle) GetGoodByID(c *gin.Context) {
+	tr := otel.Tracer("api-gateway")
+	ctx, span := tr.Start(c.Request.Context(), "handler.GetGoodByID")
+	defer span.End()
+
 	//создаем для поиска товара по id
 	id := c.Param("id") //добавить везде debug
 
-	good, err := h.goodsUC.GetGoodByID(c.Request.Context(), id)
+	good, err := h.goodsUC.GetGoodByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, apperr.ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "404 Not Found"})
@@ -109,6 +124,10 @@ func (h *Handle) GetGoodByID(c *gin.Context) {
 
 // добавляем новую запись в бд
 func (h *Handle) InsertStore(c *gin.Context) {
+	tr := otel.Tracer("api-gateway")
+	ctx, span := tr.Start(c.Request.Context(), "handler.InsertStore")
+	defer span.End()
+
 	newGood := models.CreateGoodRequest{}
 	//считываем json данные и присваиваем их переменной newGood
 	if err := c.BindJSON(&newGood); err != nil {
@@ -132,7 +151,7 @@ func (h *Handle) InsertStore(c *gin.Context) {
 		Name:     newGood.Name,
 		Price:    newGood.Price,
 	}
-	if err := h.goodsUC.InsertStore(c, &dbModel); err != nil {
+	if err := h.goodsUC.InsertStore(ctx, &dbModel); err != nil {
 		slog.Error("InsertStore error", slog.Any("error", err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't assign data"})
 		return
@@ -143,8 +162,12 @@ func (h *Handle) InsertStore(c *gin.Context) {
 
 // Удаляем товар
 func (h *Handle) DeleteById(c *gin.Context) {
+	tr := otel.Tracer("api-gateway")
+	ctx, span := tr.Start(c.Request.Context(), "handler.DeleteByID")
+	defer span.End()
+
 	id := c.Param("id")
-	if err := h.goodsUC.DeleteById(c, id); err != nil {
+	if err := h.goodsUC.DeleteById(ctx, id); err != nil {
 		slog.Error("DeleteById error", slog.Any("error", err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "couldn't assign data"})
 		return

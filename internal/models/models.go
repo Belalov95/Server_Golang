@@ -46,17 +46,16 @@ type GoodResponse struct {
 
 // Она берёт данные из модели БД и подготавливает их для ответа клиенту (например, по HTTP) .
 func ToResponse(dbGoods []Footballstore) []GoodResponse {
-	var goods []GoodResponse
-
+	goods := make([]GoodResponse, len(dbGoods))
 	//Преобразовываем данные из модели базы данных в структуру Response, чтобы вывести клиенту именно те данные из
 	//базы, которые нужны ему
-	for _, dbGood := range dbGoods {
-		goods = append(goods, GoodResponse{
+	for i, dbGood := range dbGoods {
+		goods[i] = GoodResponse{
 			ID:       dbGood.ID,
 			Category: dbGood.Category,
 			Name:     dbGood.Name,
 			Price:    dbGood.Price,
-		})
+		}
 	}
 	return goods
 }

@@ -8,9 +8,9 @@ import (
 )
 
 type CacheDecorator struct {
-	goodsRepo repository.GoodsProvider        //репозиторий для загрузки данных
-	goods     map[string]models.Footballstore //добавляем в мапу id которые хранятся в массиве в качестве значения мапы
+	goodsRepo repository.GoodsProvider //репозиторий для загрузки данных
 	mu        sync.RWMutex
+	goods     map[string]models.Footballstore //добавляем в мапу id которые хранятся в массиве в качестве значения мапы
 }
 
 func New(goodsRepo repository.GoodsProvider) *CacheDecorator {
@@ -23,23 +23,23 @@ func New(goodsRepo repository.GoodsProvider) *CacheDecorator {
 // метод Get для получения товара из кеша
 func (c *CacheDecorator) Get(id string) (models.Footballstore, bool) {
 	c.mu.RLock()
+	defer c.mu.RUnlock()
 	goods, ok := c.goods[id]
-	c.mu.RUnlock()
 	return goods, ok
 }
 
 // Set для сохранения товара в кеше
 func (c *CacheDecorator) Set(goods models.Footballstore) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.goods[goods.ID] = goods
-	c.mu.Unlock()
 }
 
 // удаляет товар из кеша
 func (c *CacheDecorator) Delete(id string) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	delete(c.goods, id)
-	c.mu.Unlock()
 }
 
 func (c *CacheDecorator) ListStore(ctx context.Context) ([]models.Footballstore, error) {
@@ -50,9 +50,7 @@ func (c *CacheDecorator) UpdateStore(ctx context.Context, updaupdatedGoods *mode
 	if err := c.goodsRepo.UpdateStore(ctx, updaupdatedGoods); err != nil {
 		return err
 	}
-	c.mu.Lock()
 	c.Set(*updaupdatedGoods) //обновляем кеш
-	c.mu.Unlock()
 	return nil
 }
 
@@ -64,9 +62,7 @@ func (c *CacheDecorator) GetGoodByID(ctx context.Context, id string) (*models.Fo
 	if err != nil {
 		return nil, err
 	}
-	c.mu.Lock()
 	c.Set(*goods) //сохраняем в кеше
-	c.mu.Unlock()
 	return goods, nil
 }
 
@@ -74,9 +70,7 @@ func (c *CacheDecorator) InsertStore(ctx context.Context, newGood *models.Footba
 	if err := c.goodsRepo.InsertStore(ctx, newGood); err != nil {
 		return err
 	}
-	c.mu.Lock()
 	c.Set(*newGood) //сохраняем в кеше
-	c.mu.Unlock()
 	return nil
 }
 
@@ -84,8 +78,6 @@ func (c *CacheDecorator) DeleteByID(ctx context.Context, id string) error {
 	if err := c.goodsRepo.DeleteByID(ctx, id); err != nil {
 		return err
 	}
-	c.mu.Lock()
 	c.Delete(id) //удаляем из кеша
-	c.mu.Unlock()
 	return nil
 }
