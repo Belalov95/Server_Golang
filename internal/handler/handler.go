@@ -27,10 +27,8 @@ func New(goodsUC usecase.GoodsProvider) *Handle {
 
 // создается для получения данных из таблицы бд
 func (h *Handle) ListStore(c *gin.Context) {
-	//создаем трейсер с названием сервера
-	tr := otel.Tracer("api-gateway")
-	//создаем span (отрезок времени который показывает сколько времени заняла операция в коде)
-	ctx, span := tr.Start(c.Request.Context(), "handler.ListStore")
+	//создаем трейсер с названием сервера и span (отрезок времени который показывает сколько времени заняла операция в коде)
+	ctx, span := otel.Tracer("api-gateway").Start(c.Request.Context(), "handler.ListStore")
 	defer span.End()
 
 	//присваиваем переменной dbGoods список товаров
@@ -42,16 +40,14 @@ func (h *Handle) ListStore(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error after sorting through the items"})
 		return
 	}
-	resp := models.ToResponse(dbGoods) //goods содержит результат функции toresponse
 	//отправляем список товаров в формате JSON
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, models.ToResponse(dbGoods)) //goods содержит результат функции toresponse
 	return
 }
 
 // создаем эту ф-цию для обновления данных в магазине (в базе данных)
 func (h *Handle) UpdateStore(c *gin.Context) {
-	tr := otel.Tracer("api-gateway")
-	ctx, span := tr.Start(c.Request.Context(), "handler.UpdateStore")
+	ctx, span := otel.Tracer("api-gateway").Start(c.Request.Context(), "handler.UpdateStore")
 	defer span.End()
 
 	id := c.Param("id")
@@ -67,12 +63,13 @@ func (h *Handle) UpdateStore(c *gin.Context) {
 	//устанавливаем ID из URL в структуру обновления
 	updatedGoods.ID = id
 	// валидация
-	if err := models.ValidateStruct(updatedGoods); err != nil {
-		errors := make(map[string]string)
+	v := validator.New()
+	if err := v.Struct(updatedGoods); err != nil {
+		validationErrors := make(map[string]string)
 		for _, fieldErr := range err.(validator.ValidationErrors) {
-			errors[fieldErr.Field()] = fieldErr.Tag() //записываем в мапу где fied - name, price ... и tag - required, gt ...
+			validationErrors[fieldErr.Field()] = fieldErr.Tag() //записываем в мапу где fied - name, price ... и tag - required, gt ...
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"validation error": errors})
+		c.JSON(http.StatusBadRequest, gin.H{"validation error": validationErrors})
 		return
 	}
 
@@ -92,8 +89,7 @@ func (h *Handle) UpdateStore(c *gin.Context) {
 
 // создается для поиска товара по его id
 func (h *Handle) GetGoodByID(c *gin.Context) {
-	tr := otel.Tracer("api-gateway")
-	ctx, span := tr.Start(c.Request.Context(), "handler.GetGoodByID")
+	ctx, span := otel.Tracer("api-gateway").Start(c.Request.Context(), "handler.GetGoodByID")
 	defer span.End()
 
 	//создаем для поиска товара по id
@@ -124,8 +120,7 @@ func (h *Handle) GetGoodByID(c *gin.Context) {
 
 // добавляем новую запись в бд
 func (h *Handle) InsertStore(c *gin.Context) {
-	tr := otel.Tracer("api-gateway")
-	ctx, span := tr.Start(c.Request.Context(), "handler.InsertStore")
+	ctx, span := otel.Tracer("api-gateway").Start(c.Request.Context(), "handler.InsertStore")
 	defer span.End()
 
 	newGood := models.CreateGoodRequest{}
@@ -137,12 +132,13 @@ func (h *Handle) InsertStore(c *gin.Context) {
 	}
 
 	//валидация
-	if err := models.ValidateStruct(newGood); err != nil {
-		errors := make(map[string]string)
+	v := validator.New()
+	if err := v.Struct(newGood); err != nil {
+		validationErrors := make(map[string]string)
 		for _, fieldErr := range err.(validator.ValidationErrors) {
-			errors[fieldErr.Field()] = fieldErr.Tag()
+			validationErrors[fieldErr.Field()] = fieldErr.Tag()
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"validation error": errors})
+		c.JSON(http.StatusBadRequest, gin.H{"validation error": validationErrors})
 		return
 	}
 
@@ -162,8 +158,7 @@ func (h *Handle) InsertStore(c *gin.Context) {
 
 // Удаляем товар
 func (h *Handle) DeleteById(c *gin.Context) {
-	tr := otel.Tracer("api-gateway")
-	ctx, span := tr.Start(c.Request.Context(), "handler.DeleteByID")
+	ctx, span := otel.Tracer("api-gateway").Start(c.Request.Context(), "handler.DeleteByID")
 	defer span.End()
 
 	id := c.Param("id")

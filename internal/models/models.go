@@ -62,12 +62,11 @@ func ToResponse(dbGoods []Footballstore) []GoodResponse {
 
 // преобразовывает входные данные из UpdateGoodRequest в формат, который понимает бд Footballstore
 func UpdatedGoodsDTO(updatedGoods UpdateGoodRequest) Footballstore {
-	dbModel := Footballstore{
+	//ретерним чтобы возвращалось значение и мы могли использовать эту функцию
+	return Footballstore{
 		ID:       updatedGoods.ID,
 		Category: updatedGoods.Category,
 		Name:     updatedGoods.Name,
 		Price:    updatedGoods.Price,
 	}
-	//ретерним чтобы возвращалось значение и мы могли использовать эту функцию
-	return dbModel
 }

@@ -1,12 +1,17 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"log/slog"
 
-	"github.com/joho/godotenv"
+	_ "embed"
+
 	"github.com/spf13/viper"
 )
+
+//go:embed config.yml
+var defaultYMLFile []byte
 
 type Config struct {
 	App struct {
@@ -32,25 +37,11 @@ func (c *Config) GetConnStr() string {
 
 func Init() (*Config, error) {
 
-	//Установка имени и типа конфигурационного файла
-	viper.SetConfigName("config")
+	//загружаем yml из embedded []byte
 	viper.SetConfigType("yml")
-
-	//Пути для поиска конфигурационного файла
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("/app/config")
-	viper.AddConfigPath("/src/config")
-	viper.AddConfigPath("./config")
-	viper.AddConfigPath("./internal/config")
-
-	//чтение конфигурационного файла config.yml
-	if err := viper.ReadInConfig(); err != nil {
-		slog.Error("Error read file", slog.Any("error", err))
-	}
-
-	//загрузка переменных окружения из .env файла
-	if err := godotenv.Load(".env"); err != nil {
-		slog.Error("Error loading data from .env file:%v", slog.Any("error", err))
+	if err := viper.ReadConfig(bytes.NewBuffer(defaultYMLFile)); err != nil {
+		slog.Error("Error reading embedded config", slog.Any("error", err))
+		return nil, err
 	}
 
 	//ручное связывание из yml и env
@@ -67,6 +58,7 @@ func Init() (*Config, error) {
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		slog.Error("Error filling data into structure", slog.Any("error", err))
+		return nil, err
 	}
 	return &cfg, nil
 }

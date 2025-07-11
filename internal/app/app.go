@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"database/sql"
+	"example/web-service-gin/database"
 	"example/web-service-gin/internal/cache"
 	"example/web-service-gin/internal/config"
 	"example/web-service-gin/internal/handler"
@@ -12,13 +12,13 @@ import (
 	"example/web-service-gin/internal/storage"
 	"example/web-service-gin/internal/tracing"
 	"example/web-service-gin/internal/usecase"
+	"time"
 
 	"fmt"
 	"log/slog"
 
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
-	"github.com/pressly/goose"
 )
 
 func Run(ctx context.Context) error {
@@ -34,36 +34,27 @@ func Run(ctx context.Context) error {
 
 	cfg, err := config.Init()
 	if err != nil {
-		return errors.Wrap(err, "Error initialization config")
+		return errors.Wrap(err, "Init config")
 	}
 
-	//открываем sql.DB для миграций
-	sqlDB, err := sql.Open("postgres", cfg.GetConnStr())
-	if err != nil {
-		return errors.Wrap(err, "failed to open sql.DB connection")
-	}
-	defer sqlDB.Close()
-
-	// Запускаем миграции
-	migrationsDir := "./database/migrations"
-	if err := goose.Up(sqlDB, migrationsDir); err != nil {
+	if err := database.Migrate(cfg.GetConnStr()); err != nil {
 		return errors.Wrap(err, "failed to run migrations")
 	}
 
 	//Подклчаемся через pgx для основного кода
 	conn, err := storage.GetConnect(cfg.GetConnStr())
 	if err != nil {
-		slog.Error("Unable to connect to database: %v\n", slog.Any("error", err))
+		slog.Error("Unable to connect to database:", slog.Any("error", err))
 		return errors.Wrap(err, "Error to connect to database")
 	}
 	//Эта строка использует ключевое слово defer, чтобы отложить выполнение функции Close до тех пор,
 	// пока функция main не завершит выполнение. Это гарантирует, что соединение с базой данных будет закрыто,
 	// даже если произойдет ошибка.
-	defer conn.Close(context.Background())
+	defer conn.Close(ctx)
 
 	repo := repository.NewGoodsRepo(conn)
 
-	cacheProvider := cache.New(repo)
+	cacheProvider := cache.New(repo, 2*time.Minute)
 	//Создает новый экземпляр бизнес логики (usecase) и передает ему соединение с бд
 	uc := usecase.New(cacheProvider)
 
@@ -81,7 +72,7 @@ func Run(ctx context.Context) error {
 
 	//запуск сервера на указанном хосте и порту
 	if err := router.Run(fmt.Sprintf(":%s", appPort)); err != nil {
-		slog.Error("Error when server starting: %v", slog.Any("error", err))
+		return errors.Wrap(err, "server run")
 	}
 	return nil
 }
