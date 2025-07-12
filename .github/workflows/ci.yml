@@ -26,7 +26,7 @@ jobs:
 
     - name: Generate mocks
       run: |
-        mockgen -source=internal/repository/goods.go -destination=internal/mocks/goods_mock.go -package=mocks
+        mockgen -source=internal/repository/interface.go -destination=internal/mocks/goods_mock.go -package=mocks
 
     - name: Build
       run: go build -v ./...
