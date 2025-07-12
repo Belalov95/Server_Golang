@@ -22,9 +22,9 @@ import (
 )
 
 func Run(ctx context.Context) error {
-	tp, err := tracing.InitTracer(ctx)
+	tp, err := tracing.Init(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to init tracer")
+		return errors.Wrap(err, "init tracer")
 	}
 	defer func() {
 		if err := tp.Shutdown(ctx); err != nil {
@@ -38,39 +38,40 @@ func Run(ctx context.Context) error {
 	}
 
 	if err := database.Migrate(cfg.GetConnStr()); err != nil {
-		return errors.Wrap(err, "failed to run migrations")
+		return errors.Wrap(err, "run migrations")
 	}
 
-	//Подклчаемся через pgx для основного кода
-	conn, err := storage.GetConnect(cfg.GetConnStr())
+	// Подклчаемся через pgx для основного кода
+	pool, err := storage.GetConnect(ctx, cfg.GetConnStr())
 	if err != nil {
-		slog.Error("Unable to connect to database:", slog.Any("error", err))
-		return errors.Wrap(err, "Error to connect to database")
+		return errors.Wrap(err, "connect to database")
 	}
-	//Эта строка использует ключевое слово defer, чтобы отложить выполнение функции Close до тех пор,
+	// Эта строка использует ключевое слово defer, чтобы отложить выполнение функции Close до тех пор,
 	// пока функция main не завершит выполнение. Это гарантирует, что соединение с базой данных будет закрыто,
 	// даже если произойдет ошибка.
-	defer conn.Close(ctx)
+	defer pool.Close()
 
-	repo := repository.NewGoodsRepo(conn)
+	repo := repository.NewGoodsRepo(pool)
 
-	cacheProvider := cache.New(repo, 2*time.Minute)
-	//Создает новый экземпляр бизнес логики (usecase) и передает ему соединение с бд
+	//используем TTL из config
+	cacheTTL := time.Duration(cfg.Cache.TTLSeconds) * time.Second
+	cacheProvider := cache.New(repo, cacheTTL)
+	// Создает новый экземпляр бизнес логики (usecase) и передает ему соединение с бд
 	uc := usecase.New(cacheProvider)
 
-	//Создает новый обработчик HTTP-запросов (handler), передавая ему экземпляр бизнес логики (uc)
-	//Обработчик будет использовать бизнес логику для обработки запросов от клиентов
+	// Создает новый обработчик HTTP-запросов (handler), передавая ему экземпляр бизнес логики (uc)
+	// Обработчик будет использовать бизнес логику для обработки запросов от клиентов
 	handle := handler.New(uc)
 
 	metrics.InitMetrics(cfg.Metrics.Port, cacheProvider)
-	//Создает новый роутер (маршрутизатор) для обработки HTTP-запросов
+	// Создает новый роутер (маршрутизатор) для обработки HTTP-запросов
 	router := router.GetRouter(handle)
 
-	//Получаем переменную окружения
+	// Получаем переменную окружения
 	appPort := cfg.App.Port
 	slog.Info("Starting the server", "address", "0.0.0.0:"+appPort)
 
-	//запуск сервера на указанном хосте и порту
+	// запуск сервера на указанном хосте и порту
 	if err := router.Run(fmt.Sprintf(":%s", appPort)); err != nil {
 		return errors.Wrap(err, "server run")
 	}

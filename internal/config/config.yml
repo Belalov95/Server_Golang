@@ -9,3 +9,5 @@ db:
   password: postgres
   name: postgres
   sslmode: disable
+cache:
+  ttl_seconds: 120

@@ -1,0 +1,35 @@
+name: Go CI
+
+on:
+  push:
+    branches: [ "db" ]
+  pull_request:
+    branches: [ "db" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23.2'
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Install mockgen
+      run: go install go.uber.org/mock/mockgen@latest
+
+    - name: Generate mocks
+      run: |
+        mockgen -source=internal/repository/goods.go -destination=internal/mocks/goods_mock.go -package=mocks
+
+    - name: Build
+      run: go build -v ./...
+
+    - name: Test
+      run: go test -v ./...

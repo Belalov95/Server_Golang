@@ -17,23 +17,23 @@ func ValidateStruct(s interface{}) error {
 
 // Request для входных данных клиента
 type CreateGoodRequest struct {
-	Category string          `json:"category" validate: "required, min = 1, max = 50"`
-	Name     string          `json:"name" validate: "required, min = 1, max = 100"`
-	Price    decimal.Decimal `json:"price" validate: "required, gt = 0"`
+	Category string          `json:"category" validate:"required,min = 1,max = 50"`
+	Name     string          `json:"name" validate:"required,min = 1,max = 100"`
+	Price    decimal.Decimal `json:"price" validate:"required,gt = 0"`
 }
 type UpdateGoodRequest struct {
-	ID       string          `json:"id" validate: "required"`
-	Category string          `json:"category" validate: "omitempty, min = 1, max = 50"`
-	Name     string          `json:"name" validate: "omitempty, min = 1, max = 100"`
-	Price    decimal.Decimal `json:"price" validate: "omitempty, gt = 0"`
+	ID       string          `json:"id" validate:"required"`
+	Category string          `json:"category" validate:"omitempty,min = 1,max = 50"`
+	Name     string          `json:"name" validate:"omitempty,min = 1,max = 100"`
+	Price    decimal.Decimal `json:"price" validate:"omitempty,gt = 0"`
 }
 
 // Database Model для работы с бд
 type Footballstore struct {
-	ID       string          `db:"id"`       //объявление номера // serial primary key
-	Category string          `db:"category"` //категория товара: Одежда, обувь, аксессуары и тд.
-	Name     string          `db:"name"`     //название товара:форма, бутсы, брелки и тд.
-	Price    decimal.Decimal `db:"price"`    //цена товара
+	ID       string          `db:"id"`       // объявление номера: serial primary key
+	Category string          `db:"category"` // категория товара: одежда, обувь, аксессуары и т.д.
+	Name     string          `db:"name"`     // название товара: форма, бутсы, брелки и т.д.
+	Price    decimal.Decimal `db:"price"`    // цена товара
 }
 
 // Response для ответа клиенту
@@ -47,26 +47,16 @@ type GoodResponse struct {
 // Она берёт данные из модели БД и подготавливает их для ответа клиенту (например, по HTTP) .
 func ToResponse(dbGoods []Footballstore) []GoodResponse {
 	goods := make([]GoodResponse, len(dbGoods))
-	//Преобразовываем данные из модели базы данных в структуру Response, чтобы вывести клиенту именно те данные из
-	//базы, которые нужны ему
+	// Преобразовываем данные из модели базы данных в структуру Response, чтобы вывести клиенту именно те данные из
+	// базы, которые нужны ему
 	for i, dbGood := range dbGoods {
-		goods[i] = GoodResponse{
-			ID:       dbGood.ID,
-			Category: dbGood.Category,
-			Name:     dbGood.Name,
-			Price:    dbGood.Price,
-		}
+		goods[i] = GoodResponse(dbGood)
 	}
 	return goods
 }
 
 // преобразовывает входные данные из UpdateGoodRequest в формат, который понимает бд Footballstore
 func UpdatedGoodsDTO(updatedGoods UpdateGoodRequest) Footballstore {
-	//ретерним чтобы возвращалось значение и мы могли использовать эту функцию
-	return Footballstore{
-		ID:       updatedGoods.ID,
-		Category: updatedGoods.Category,
-		Name:     updatedGoods.Name,
-		Price:    updatedGoods.Price,
-	}
+	// ретерним чтобы возвращалось значение и мы могли использовать эту функцию
+	return Footballstore(updatedGoods)
 }

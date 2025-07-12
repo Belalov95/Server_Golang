@@ -15,10 +15,10 @@ type wrapGoods struct {
 }
 
 type CacheDecorator struct {
-	goodsRepo repository.GoodsProvider //репозиторий для загрузки данных
+	goodsRepo repository.GoodsProvider // репозиторий для загрузки данных
 	mu        sync.RWMutex
-	goods     map[string]wrapGoods //добавляем в мапу id которые хранятся в массиве в качестве значения мапы
-	ttl       time.Duration        //время жизни кеша
+	goods     map[string]wrapGoods // добавляем в мапу id которые хранятся в массиве в качестве значения мапы
+	ttl       time.Duration        // время жизни кеша
 }
 
 func New(goodsRepo repository.GoodsProvider, ttl time.Duration) *CacheDecorator {
@@ -38,7 +38,7 @@ func (c *CacheDecorator) Get(id string) (models.Footballstore, bool) {
 		return models.Footballstore{}, false
 	}
 
-	//проверка времени жизни записи
+	// проверка времени жизни записи
 	if time.Since(wrapped.updatedAt) > c.ttl {
 		c.mu.RUnlock()
 		c.mu.Lock()
@@ -69,7 +69,7 @@ func (c *CacheDecorator) Delete(id string) {
 
 // удаляем просроченные записи из кеша
 func (c *CacheDecorator) CleanupExpired() {
-	now := time.Now() //фиксируем время старта
+	now := time.Now() // фиксируем время старта
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for id, wrapped := range c.goods {
@@ -85,10 +85,10 @@ func (c *CacheDecorator) RunCleanup(ctx context.Context, interval time.Duration)
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
-			select { //ждет пока один из каналов не даст сигнал и запускает соответствующий код
-			case <-ticker.C: //канал на который тикер каждый интервал времени отправляет сигнал
-				c.CleanupExpired() //если пришел сигнал от тикера то выполняем очистку
-			case <-ctx.Done(): //сигнал, который отправляется, когда контекст отменяется
+			select { // ждет пока один из каналов не даст сигнал и запускает соответствующий код
+			case <-ticker.C: // канал на который тикер каждый интервал времени отправляет сигнал
+				c.CleanupExpired() // если пришел сигнал от тикера то выполняем очистку
+			case <-ctx.Done(): // сигнал, который отправляется, когда контекст отменяется
 				return
 			}
 		}
@@ -96,26 +96,26 @@ func (c *CacheDecorator) RunCleanup(ctx context.Context, interval time.Duration)
 }
 
 func (c *CacheDecorator) ListStore(ctx context.Context) ([]models.Footballstore, error) {
-	return c.goodsRepo.ListStore(ctx) //загрузка данных из репозитория
+	return c.goodsRepo.ListStore(ctx) // загрузка данных из репозитория
 }
 
 func (c *CacheDecorator) UpdateStore(ctx context.Context, updaupdatedGoods *models.Footballstore) error {
 	if err := c.goodsRepo.UpdateStore(ctx, updaupdatedGoods); err != nil {
 		return err
 	}
-	c.Set(*updaupdatedGoods) //обновляем кеш
+	c.Set(*updaupdatedGoods) // обновляем кеш
 	return nil
 }
 
 func (c *CacheDecorator) GetGoodByID(ctx context.Context, id string) (*models.Footballstore, error) {
-	if goods, ok := c.Get(id); ok { //проверяем содержится ли товар в кеше
+	if goods, ok := c.Get(id); ok { // проверяем содержится ли товар в кеше
 		return &goods, nil
 	}
 	goods, err := c.goodsRepo.GetGoodByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	c.Set(*goods) //сохраняем в кеше
+	c.Set(*goods) // сохраняем в кеше
 	return goods, nil
 }
 
@@ -123,7 +123,7 @@ func (c *CacheDecorator) InsertStore(ctx context.Context, newGood *models.Footba
 	if err := c.goodsRepo.InsertStore(ctx, newGood); err != nil {
 		return err
 	}
-	c.Set(*newGood) //сохраняем в кеше
+	c.Set(*newGood) // сохраняем в кеше
 	return nil
 }
 
@@ -131,6 +131,6 @@ func (c *CacheDecorator) DeleteByID(ctx context.Context, id string) error {
 	if err := c.goodsRepo.DeleteByID(ctx, id); err != nil {
 		return err
 	}
-	c.Delete(id) //удаляем из кеша
+	c.Delete(id) // удаляем из кеша
 	return nil
 }

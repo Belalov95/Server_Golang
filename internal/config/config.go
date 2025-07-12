@@ -15,19 +15,22 @@ var defaultYMLFile []byte
 
 type Config struct {
 	App struct {
-		Port string `mapstructure:"port"`
-	} `mapstructure:"app"`
+		Port string
+	}
 	Metrics struct {
-		Port string `mapstructure:"port"`
-	} `mapstructure:"metrics"`
+		Port string
+	}
 	Db struct {
-		Port     string `mapstructure:"port"`
-		Host     string `mapstructure:"host"`
-		User     string `mapstructure:"user"`
-		Password string `mapstructure:"password"`
-		Name     string `mapstructure:"name"`
-		SSLMode  string `mapstructure:"sslmode"`
-	} `mapstructure:"db"`
+		Port     string
+		Host     string
+		User     string
+		Password string
+		Name     string
+		SSLMode  string
+	}
+	Cache struct {
+		TTLSeconds int
+	}
 }
 
 func (c *Config) GetConnStr() string {
@@ -36,15 +39,14 @@ func (c *Config) GetConnStr() string {
 }
 
 func Init() (*Config, error) {
-
-	//загружаем yml из embedded []byte
+	// загружаем yml из embedded []byte
 	viper.SetConfigType("yml")
 	if err := viper.ReadConfig(bytes.NewBuffer(defaultYMLFile)); err != nil {
 		slog.Error("Error reading embedded config", slog.Any("error", err))
 		return nil, err
 	}
 
-	//ручное связывание из yml и env
+	// ручное связывание из yml и env
 	_ = viper.BindEnv("app.port", "APP_PORT")
 	_ = viper.BindEnv("db.port", "DB_PORT")
 	_ = viper.BindEnv("db.host", "DB_HOST")
@@ -54,7 +56,7 @@ func Init() (*Config, error) {
 	_ = viper.BindEnv("db.sslmode", "DB_SSLMODE")
 	_ = viper.BindEnv("metrics.port", "METRICS_PORT")
 
-	//Разбор конфигурации в структуру
+	// Разбор конфигурации в структуру
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		slog.Error("Error filling data into structure", slog.Any("error", err))

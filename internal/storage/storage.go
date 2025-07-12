@@ -3,20 +3,29 @@ package storage
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/exaring/otelpgx"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 )
 
-func GetConnect(connStr string) (*pgx.Conn, error) { //создается для соединения с бд
-	conn, err := pgx.Connect(context.Background(), connStr)
+func GetConnect(ctx context.Context, connStr string) (*pgxpool.Pool, error) { // создается для соединения с бд
+	cfg, err := pgxpool.ParseConfig(connStr)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to database")
 	}
 
-	err = conn.Ping(context.Background())
-	if err != nil {
-		return nil, errors.Wrap(err, "Unable to ping database")
+	// Добавляем трассировщик от otelpgx
+	cfg.ConnConfig.Tracer = otelpgx.NewTracer()
 
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "create pgxpool")
 	}
-	return conn, nil
+
+	// проверяем подключение
+	if err := pool.Ping(ctx); err != nil {
+		return nil, errors.Wrap(err, "Unable to ping database")
+	}
+
+	return pool, nil
 }
