@@ -21,12 +21,15 @@ jobs:
     - name: Install dependencies
       run: go mod download
 
+    - name: Add gomock to dependencies
+      run: go get go.uber.org/mock/gomock@latest
+
     - name: Install mockgen
       run: go install go.uber.org/mock/mockgen@latest
 
     - name: Generate mocks
       run: |
-        mockgen -source=internal/repository/interface.go -destination=internal/mocks/goods_mock.go -package=mocks
+        mockgen -source=internal/repository/goods.go -destination=internal/mocks/goods_mock.go -package=mocks
 
     - name: Build
       run: go build -v ./...
