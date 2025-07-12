@@ -22,10 +22,11 @@ jobs:
       run: go mod download
 
     - name: Add gomock to dependencies
-      run: go get go.uber.org/mock/gomock@latest
+      run: go get github.com/golang/mock/mockgen@v1.6.0
 
     - name: Install mockgen
-      run: go install go.uber.org/mock/mockgen@latest
+      run: go install github.com/golang/mock/mockgen@v1.6.0
+
 
     - name: Generate mocks
       run: |
