@@ -1,6 +1,6 @@
 module example/web-service-gin
 
-go 1.23.2
+go 1.24
 
 require (
 	github.com/exaring/otelpgx v0.9.3
