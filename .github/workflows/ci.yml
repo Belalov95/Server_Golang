@@ -56,7 +56,7 @@ jobs:
         uses: golangci/golangci-lint-action@v4
         with:
           version: v1.54.2
-          args: run ./...
+          args: run --modules-download-mode=readonly ./...
 
   test:
     name: Test + Mocks
