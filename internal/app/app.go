@@ -53,7 +53,7 @@ func Run(ctx context.Context) error {
 
 	repo := repository.NewGoodsRepo(pool)
 
-	//используем TTL из config
+	// используем TTL из config
 	cacheTTL := time.Duration(cfg.Cache.TTLSeconds) * time.Second
 	cacheProvider := cache.New(repo, cacheTTL)
 	// Создает новый экземпляр бизнес логики (usecase) и передает ему соединение с бд
