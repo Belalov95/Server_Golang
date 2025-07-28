@@ -71,7 +71,7 @@ jobs:
           POSTGRES_DB: postgres
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
-          - 5432
+          - 5433:5432
         options: >-
           --health-cmd="sh -c 'pg_isready -U postgres'"
           --health-interval 10s
@@ -79,7 +79,7 @@ jobs:
           --health-retries 5
 
     env:
-      DB_URL: postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
+      DB_URL: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
 
     steps:
       - name: Checkout code
@@ -111,6 +111,10 @@ jobs:
           mockgen -source=internal/repository/interface.go \
                   -destination=internal/mocks/goods_mock.go \
                   -package=mocks
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+        
       - name: Wait for PostgreSQL to be ready
         run: |
           set -e
