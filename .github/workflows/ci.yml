@@ -102,7 +102,7 @@ jobs:
                   -package=mocks
 
       - name: Run migrations for integration tests
-        run: go run ./database/migrations/migrate.go
+        run: go run ./database/migrate.go
         env:
           DB_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
 
