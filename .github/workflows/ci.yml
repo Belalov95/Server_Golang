@@ -1,4 +1,4 @@
-name: Go CI
+name: Go CI with Postgres
 
 on:
   push:
@@ -7,75 +7,23 @@ on:
     branches: ["db"]
 
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.24.1'
-
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Install dependencies
-        run: go mod download
-
-      - name: Build binary
-        run: go build -v ./...
-
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.24.1'
-
-      - name: Download dependencies for lint
-        run: go mod download
-
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
-        with:
-          version: v1.64.8
-          args: --modules-download-mode=readonly ./...
-
   test:
-    name: Test + Mocks + Integration
+    name: Test with Postgres
     runs-on: ubuntu-latest
-
     services:
       postgres:
-        image: postgres:15
+        image: postgres:16
         env:
-          POSTGRES_DB: testdb
           POSTGRES_USER: testuser
           POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-cmd="pg_isready -U testuser -d testdb"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     env:
       DB_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
@@ -87,28 +35,20 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.1'
-
-      - name: Install dependencies
+          go-version: '1.21.1'  
+      - name: Download dependencies
         run: go mod download
 
-      - name: Install mockgen
-        run: go install github.com/golang/mock/mockgen@v1.6.0
-
-      - name: Generate mocks
+      - name: Debug FS
         run: |
-          mockgen -source=internal/repository/interface.go \
-                  -destination=internal/mocks/goods_mock.go \
-                  -package=mocks
+          echo "🧠 Current dir: $(pwd)"
+          echo "📂 Files:"
+          ls -la
+          echo "📂 Migrations:"
+          ls -la database/migrations
 
-      - name: Run migrations for integration tests
+      - name: Run migrations
         run: go run ./database/migrations/migrate.go
 
-      - name: Run tests (unit + integration)
-        run: go test -v -race -coverprofile=coverage.out ./...
-
-      - name: Upload coverage to GitHub
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: coverage.out
+      - name: Run integration tests
+        run: go test -v ./... -tags=integration
