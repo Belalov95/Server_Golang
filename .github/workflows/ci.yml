@@ -62,24 +62,24 @@ jobs:
     name: Test + Mocks + Integration
     runs-on: ubuntu-latest
 
-  services:
-    postgres:
-      image: postgres:14.10-alpine
-      env:
-        POSTGRES_USER: postgres
-        POSTGRES_PASSWORD: postgres
-        POSTGRES_DB: postgres
-        POSTGRES_HOST_AUTH_METHOD: trust
-      ports:
-        - 5433:5432
-      options: >-
-        --health-cmd pg_isready -U postgres
-        --health-interval 10s
-        --health-timeout 5s
-        --health-retries 5
+    services:
+      postgres:
+        image: postgres:14.10-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready -U postgres
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-  env:
-    DB_URL: postgres://postgres:postgres@localhost:5433/postgres?sslmode=disable
+    env:
+      DB_URL: postgres://postgres:postgres@localhost:5433/postgres?sslmode=disable
 
     steps:
       - name: Checkout code
