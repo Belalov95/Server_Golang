@@ -2,19 +2,19 @@ package main
 
 import (
 	"example/web-service-gin/database"
-	"example/web-service-gin/internal/config"
 	"log"
+	"os"
 )
 
 func main() {
-	cfg, err := config.Init()
-	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+	dbURL := os.Getenv("DB_URL")
+	if dbURL == "" {
+		log.Fatal("DB_URL is required")
 	}
 
-	if err := database.Migrate(cfg.GetConnStr()); err != nil {
+	log.Printf("Applying migrations to %s", dbURL)
+	if err := database.Migrate(dbURL); err != nil {
 		log.Fatalf("Migration failed: %v", err)
 	}
-
-	log.Println("Migration successful")
+	log.Println("✅ Migrations applied")
 }
