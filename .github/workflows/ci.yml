@@ -111,7 +111,19 @@ jobs:
           mockgen -source=internal/repository/interface.go \
                   -destination=internal/mocks/goods_mock.go \
                   -package=mocks
-
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          set -e
+          for i in {1..15}; do
+            if echo "SELECT 1;" | PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -t > /dev/null 2>&1; then
+              echo "PostgreSQL is ready!"
+              exit 0
+          fi
+          echo "⏳ Waiting for PostgreSQL... ($i/15)"
+          sleep 5
+          done
+          echo "PostgreSQL failed to start"
+          exit 1
       - name: Run migrations
         run: go run ./cmd/migrate
         env:
