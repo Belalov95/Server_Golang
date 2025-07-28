@@ -62,55 +62,56 @@ jobs:
     name: Test + Mocks + Integration
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_DB: testdb
-          POSTGRES_USER: testuser
-          POSTGRES_PASSWORD: testpass
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+  services:
+    postgres:
+      image: postgres:14.10-alpine
+      env:
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+        POSTGRES_DB: postgres
+        POSTGRES_HOST_AUTH_METHOD: trust
+      ports:
+        - 5433:5432
+      options: >-
+        --health-cmd pg_isready -U postgres
+        --health-interval 10s
+        --health-timeout 5s
+        --health-retries 5
 
-    env:
-      DB_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
+  env:
+    DB_URL: postgres://postgres:postgres@localhost:5433/postgres?sslmode=disable
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.24.1'
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24.1'
 
-      - name: Install dependencies
-        run: go mod download
+    - name: Install dependencies
+      run: go mod download
 
-      - name: Install mockgen
-        run: go install github.com/golang/mock/mockgen@v1.6.0
+    - name: Install mockgen
+      run: go install github.com/golang/mock/mockgen@v1.6.0
 
-      - name: Generate mocks
-        run: |
-          mockgen -source=internal/repository/interface.go \
-                  -destination=internal/mocks/goods_mock.go \
-                  -package=mocks
+    - name: Generate mocks
+      run: |
+        mockgen -source=internal/repository/interface.go \
+                -destination=internal/mocks/goods_mock.go \
+                -package=mocks
 
-      - name: Run migrations for integration tests
-        run: go run ./database/migrate.go
-        env:
-          DB_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
+    - name: Run migrations for integration tests
+      run: go run ./cmd/migrate
+      env:
+        DB_URL: postgres://postgres:postgres@localhost:5433/postgres?sslmode=disable
 
-      - name: Run tests (unit + integration)
-        run: go test -v -race -coverprofile=coverage.out ./...
+    - name: Run tests (unit + integration)
+      run: go test -v -race -coverprofile=coverage.out ./...
 
-      - name: Upload coverage to GitHub
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: coverage.out
+    - name: Upload coverage to GitHub
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage
+        path: coverage.out
