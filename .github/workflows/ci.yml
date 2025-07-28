@@ -71,12 +71,12 @@ jobs:
           POSTGRES_DB: postgres
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
-          - 5433:5432
+          - 5432
         options: >-
-          --health-cmd="sh -c 'pg_isready -U postgres'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-cmd=sh -c "pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     env:
       DB_URL: postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
@@ -114,9 +114,29 @@ jobs:
 
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
-        
+
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          set -e
+          for i in {1..30}; do
+            if echo "SELECT 1;" | PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -t > /dev/null 2>&1; then
+              echo "PostgreSQL is ready!"
+              exit 0
+            fi
+            echo "⏳ Waiting for PostgreSQL... ($i/30)"
+            sleep 5
+          done
+          echo "PostgreSQL failed to start"
+          exit 1
+
+      - name: Print PostgreSQL container logs
+        run: |
+          sleep 3
+          docker logs $(docker ps -qf "ancestor=postgres:14.10-alpine") || true
+        if: always()
+
       - name: Run migrations
-        run: go run ./cmd/migrate
+        run: go run ./cmd/migrate/main.go
         env:
           DB_URL: ${{ env.DB_URL }}
 
@@ -128,3 +148,4 @@ jobs:
         with:
           name: coverage
           path: coverage.out
+          
