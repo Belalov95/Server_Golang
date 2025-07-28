@@ -66,20 +66,20 @@ jobs:
       postgres:
         image: postgres:14.10-alpine
         env:
-          POSTGRES_USER: testdb
-          POSTGRES_PASSWORD: testuser
-          POSTGRES_DB: testpass
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
-          - 5432/tcp
+          - 5432
         options: >-
-          --health-cmd="sh -c'pg_isready -U postgres'"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+          --health-cmd=sh -c "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     env:
-      DB_URL: postgres://testuser:testpass@postgres:5432/testdb?sslmode=disable
+      DB_URL: postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
 
     steps:
       - name: Checkout code
@@ -122,21 +122,18 @@ jobs:
             if echo "SELECT 1;" | PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -t > /dev/null 2>&1; then
               echo "PostgreSQL is ready!"
               exit 0
-            fi
-            echo "⏳ Waiting for PostgreSQL... ($i/30)"
-            sleep 5
+          fi
+          echo "Waiting for PostgreSQL... ($i/30)"
+          sleep 5
           done
           echo "PostgreSQL failed to start"
           exit 1
 
       - name: Print PostgreSQL container logs
-        run: |
-          sleep 3
-          docker logs $(docker ps -qf "ancestor=postgres:14.10-alpine") || true
-        if: always()
+        run: docker logs $(docker ps -aqf "ancestor=postgres:14.10-alpine") || true
 
       - name: Run migrations
-        run: go run ./cmd/migrate/main.go
+        run: go run ./cmd/migrate
         env:
           DB_URL: ${{ env.DB_URL }}
 
