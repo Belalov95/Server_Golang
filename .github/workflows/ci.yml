@@ -88,9 +88,19 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.1'
+          go-version: '1.21.6'
 
-      - name: Install dependencies
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
         run: go mod download
 
       - name: Install mockgen
@@ -99,18 +109,18 @@ jobs:
       - name: Generate mocks
         run: |
           mockgen -source=internal/repository/interface.go \
-                -destination=internal/mocks/goods_mock.go \
-                -package=mocks
+                  -destination=internal/mocks/goods_mock.go \
+                  -package=mocks
 
-      - name: Run migrations for integration tests
+      - name: Run migrations
         run: go run ./cmd/migrate
         env:
-          DB_URL: postgres://postgres:postgres@localhost:5433/postgres?sslmode=disable
+          DB_URL: ${{ env.DB_URL }}
 
-      - name: Run tests (unit + integration)
+      - name: Run tests
         run: go test -v -race -coverprofile=coverage.out ./...
 
-      - name: Upload coverage to GitHub
+      - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
           name: coverage
