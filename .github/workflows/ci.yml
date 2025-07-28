@@ -59,8 +59,26 @@ jobs:
           args: --modules-download-mode=readonly ./...
 
   test:
-    name: Test + Mocks
+    name: Test + Mocks + Integration
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
 
     steps:
       - name: Checkout code
@@ -83,10 +101,13 @@ jobs:
                   -destination=internal/mocks/goods_mock.go \
                   -package=mocks
 
-      - name: Run tests
+      - name: Run migrations for integration tests
+        run: go run ./database/migrations/migrate.go
+
+      - name: Run tests (unit + integration)
         run: go test -v -race -coverprofile=coverage.out ./...
 
-      - name: Upload coverage to GitHub (optional)
+      - name: Upload coverage to GitHub
         uses: actions/upload-artifact@v4
         with:
           name: coverage

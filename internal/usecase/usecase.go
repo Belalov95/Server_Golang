@@ -25,6 +25,7 @@ func (g *GoodsUsecase) UpdateStore(ctx context.Context, updatedGoods *models.Foo
 func (g *GoodsUsecase) GetGoodByID(ctx context.Context, id string) (*models.Footballstore, error) {
 	return g.goodsRepo.GetGoodByID(ctx, id)
 }
+
 func (g *GoodsUsecase) InsertStore(ctx context.Context, newGood *models.Footballstore) error {
 	return g.goodsRepo.InsertStore(ctx, newGood)
 }
