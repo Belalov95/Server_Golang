@@ -66,12 +66,12 @@ jobs:
       postgres:
         image: postgres:14.10-alpine
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
+          POSTGRES_USER: testdb
+          POSTGRES_PASSWORD: testuser
+          POSTGRES_DB: testpass
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
-          - 5432
+          - 5432/tcp
         options: >-
           --health-cmd="sh -c'pg_isready -U postgres'"
           --health-interval=10s
@@ -79,7 +79,7 @@ jobs:
           --health-retries=5
 
     env:
-      DB_URL: postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
+      DB_URL: postgres://testuser:testpass@postgres:5432/testdb?sslmode=disable
 
     steps:
       - name: Checkout code
