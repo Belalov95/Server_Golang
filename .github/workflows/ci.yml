@@ -77,11 +77,7 @@ jobs:
         ports:
           - 5432/tcp 
         options: >-
-          --health-cmd=pg_isready
-          --health-arg=-U
-          --health-arg=testuser
-          --health-arg=-d
-          --health-arg=testdb
+          --health-cmd=pg_isready -U testuser -d testdb
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
@@ -155,4 +151,3 @@ jobs:
         with:
           name: coverage
           path: coverage.out
-          
