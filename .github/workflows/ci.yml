@@ -62,24 +62,29 @@ jobs:
     name: Test + Mocks + Integration
     runs-on: ubuntu-latest
 
+    env:
+      ACTIONS_STEP_DEBUG: true
+      DB_URL: postgres://testuser:testpass@postgres:5432/testdb?sslmode=disable
+
     services:
       postgres:
         image: postgres:14.10-alpine
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
+          POSTGRES_DB: testdb
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
-          - 5433:5432
+          - 5432/tcp 
         options: >-
-          --health-cmd="sh -c 'pg_isready -U postgres'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      DB_URL: postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
+          --health-cmd=pg_isready
+          --health-arg=-U
+          --health-arg=testuser
+          --health-arg=-d
+          --health-arg=testdb
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
       - name: Checkout code
@@ -118,19 +123,24 @@ jobs:
       - name: Wait for PostgreSQL to be ready
         run: |
           set -e
-          for i in {1..15}; do
-            if echo "SELECT 1;" | PGPASSWORD=postgres psql -h postgres -U postgres -d postgres -t > /dev/null 2>&1; then
+          for i in {1..30}; do
+            if pg_isready -h postgres -U testuser -d testdb; then
               echo "PostgreSQL is ready!"
               exit 0
-          fi
-          echo "Waiting for PostgreSQL... ($i/15)"
-          sleep 5
+            fi
+            echo "Waiting for PostgreSQL... ($i/30)"
+            sleep 5
           done
           echo "PostgreSQL failed to start"
           exit 1
 
-      - name: Print PostgreSQL container logs
-        run: docker logs $(docker ps -aqf "ancestor=postgres:14.10-alpine") || true
+      - name: Print PostgreSQL container logs on failure
+        if: always()
+        run: |
+          echo "Containers:"
+          docker ps -a
+          echo "PostgreSQL logs:"
+          docker logs $(docker ps -q --filter "ancestor=postgres:14.10-alpine") 2>&1 || true
 
       - name: Run migrations
         run: go run ./cmd/migrate/main.go
@@ -145,3 +155,4 @@ jobs:
         with:
           name: coverage
           path: coverage.out
+          

@@ -16,5 +16,5 @@ func main() {
 	if err := database.Migrate(dbURL); err != nil {
 		log.Fatalf("Migration failed: %v", err)
 	}
-	log.Println("✅ Migrations applied")
+	log.Println("Migrations applied")
 }
