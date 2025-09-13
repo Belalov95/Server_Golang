@@ -53,7 +53,7 @@ jobs:
       - run: go mod download
 
       - name: Run unit tests
-        run: go test -v -race -coverprofile=coverage.out ./... -skip-integration
+        run: go test -v -race -coverprofile=coverage.out ./... 
 
       - uses: actions/upload-artifact@v4
         with:
@@ -118,6 +118,6 @@ jobs:
           DB_URL: ${{ env.DB_URL }}
 
       - name: Run integration tests
-        run: go test -v ./... -args -integration
+        run: go test -v ./integration/... -args -integration
         env:
           DB_URL: ${{ env.DB_URL }}
