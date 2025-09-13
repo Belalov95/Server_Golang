@@ -12,77 +12,84 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - uses: actions/setup-go@v4
         with:
           go-version: '1.24'
 
-      - name: Install dependencies
-        run: go mod download
+      - run: go mod download
 
-      - name: Build binary
-        run: go build -v ./...
+      - run: go build -v ./...
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - uses: actions/setup-go@v4
         with:
           go-version: '1.24'
 
-      - name: Download dependencies for lint
-        run: go mod download
+      - run: go mod download
 
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v4
+      - uses: golangci/golangci-lint-action@v4
         with:
           version: v1.64.8
           args: --modules-download-mode=readonly ./...
 
-  test:
-    name: Test + Mocks + Integration
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+
+      - run: go mod download
+
+      - name: Run unit tests
+        run: go test -v -race -coverprofile=coverage.out ./... -skip-integration
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: coverage.out
+
+  integration-tests:
+    name: Integration Tests
     runs-on: ubuntu-latest
 
     env:
-      ACTIONS_STEP_DEBUG: true
-      DB_URL: postgres://postgres:postgres@localhost:5432/testdb?sslmode=disable
+      DB_URL: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
 
     services:
       postgres:
         image: postgres:14.10-alpine
         env:
-          POSTGRES_DB: testdb
+          POSTGRES_DB: postgres
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
-          - 5432/tcp 
+          - 5432:5432
         options: >-
-          --health-cmd="sh -c 'pg_isready -U testuser -d testdb'"
-          --health-interval=10s
+          --health-cmd="pg_isready -U postgres -d postgres"
+          --health-interval=5s
           --health-timeout=5s
-          --health-retries=20
+          --health-retries=10
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
+      - uses: actions/setup-go@v4
         with:
           go-version: '1.24'
 
-      - name: Download dependencies
-        run: go mod download
+      - run: go mod download
 
       - name: Install mockgen
         run: go install github.com/golang/mock/mockgen@v1.6.0
@@ -93,41 +100,24 @@ jobs:
                   -destination=internal/mocks/goods_mock.go \
                   -package=mocks
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
-      - name: Wait for PostgreSQL to be ready
+      - name: Wait for Postgres
         run: |
-          set -e
           for i in {1..15}; do
-            if pg_isready -h postgres -U testuser -d testdb; then
-              echo "PostgreSQL is ready!"
+            if pg_isready -h localhost -U postgres -d postgres; then
+              echo "Postgres is ready!"
               exit 0
             fi
-            echo "Waiting for PostgreSQL... ($i/15)"
+            echo "Waiting for Postgres ($i/15)..."
             sleep 5
           done
-          echo "PostgreSQL failed to start"
           exit 1
-
-      - name: Print PostgreSQL container logs on failure
-        if: always()
-        run: |
-          echo "Containers:"
-          docker ps -a
-          echo "PostgreSQL logs:"
-          docker logs $(docker ps -q --filter "ancestor=postgres:14.10-alpine") 2>&1 || true
 
       - name: Run migrations
         run: go run ./cmd/migrate/main.go
         env:
           DB_URL: ${{ env.DB_URL }}
 
-      - name: Run tests
-        run: go test -v -race -coverprofile=coverage.out ./...
-
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: coverage.out
+      - name: Run integration tests
+        run: go test -v ./... -args -integration
+        env:
+          DB_URL: ${{ env.DB_URL }}
